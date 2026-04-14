@@ -14,9 +14,11 @@ import {
     Clock, 
     ArrowRight,
     Users,
-    Hammer
+    Hammer,
+    Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Receipt } from '@/components/pos/Receipt';
 
 export default function DashboardPage() {
     const [stats, setStats] = useState({
@@ -26,9 +28,8 @@ export default function DashboardPage() {
         lowStockCount: 0
     });
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
-    
-    // Health status
     const [health, setHealth] = useState({ status: 'offline', database: 'unknown', network: 'unknown' });
+    const [selectedTx, setSelectedTx] = useState<any | null>(null);
     
     const router = useRouter();
 
@@ -58,6 +59,15 @@ export default function DashboardPage() {
         const healthInterval = setInterval(fetchHealth, 10000);
         return () => clearInterval(healthInterval);
     }, []);
+
+    const handleViewReceipt = async (id: number) => {
+        try {
+            const res = await api.get(`/transactions/${id}`);
+            setSelectedTx(res.data);
+        } catch (error) {
+            console.error('Failed to fetch transaction details', error);
+        }
+    };
 
     const statConfig = [
         {
@@ -144,7 +154,7 @@ export default function DashboardPage() {
                                     <CardTitle>Recent Activity</CardTitle>
                                     <CardDescription>Latest workshop transactions and service orders</CardDescription>
                                 </div>
-                                <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => router.push('/reports')}>
+                                <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => router.push('/transactions')}>
                                     View All <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
                             </CardHeader>
@@ -165,7 +175,7 @@ export default function DashboardPage() {
                                                 <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-400 italic">No recent transactions found.</td></tr>
                                             ) : (
                                                 recentActivity.map((tx) => (
-                                                    <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer" onClick={() => handleViewReceipt(tx.id)}>
                                                         <td className="px-4 py-4">
                                                             <span className="font-bold text-neutral group-hover:text-primary transition-colors">{tx.invoice_number}</span>
                                                         </td>
@@ -213,8 +223,8 @@ export default function DashboardPage() {
                                         New Transaction
                                     </Button>
                                     <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20" onClick={() => router.push('/inventory')}>
-                                        <Hammer className="mr-3 h-5 w-5" />
-                                        Add Inventory
+                                        <Package className="mr-3 h-5 w-5" />
+                                        Inventory Overview
                                     </Button>
                                     <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20" onClick={() => router.push('/settings')}>
                                         <Users className="mr-3 h-5 w-5" />
@@ -251,6 +261,14 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Receipt Preview Modal */}
+                {selectedTx && (
+                    <Receipt 
+                        transaction={selectedTx} 
+                        onClose={() => setSelectedTx(null)} 
+                    />
+                )}
             </DashboardLayout>
         </ProtectedRoute>
     );

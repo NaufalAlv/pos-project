@@ -1,11 +1,26 @@
 # Changelog
 
-## [1.3.0] - 2026-04-14
+## [1.3.3] - 2026-04-14
 ### Added
-- **Global Inventory Movements**: New dedicated page for viewing all stock transactions across the shop.
-- **Advanced Filtering & Sorting**: Both Inventory and History pages now support searching, category filtering, and clickable column headers for sorting (High ↔ Low).
-- **UI Refactor (Action Menu)**: Replaced row action buttons with a single `MoreVertical` (triple dots) button that opens a compact 2x2 clustered icon menu for History, Restock, Edit, and Delete.
-- **Navigation**: Added "View All Movements" shortcut to the Inventory dashboard.
+- **Custom Service Billing**: New "Add Service" feature in POS to bill for non-inventory items (Labor, Tips, Towing).
+- **Cash Handing Logic**: Real-time "Change to Return" calculator in the checkout sidebar.
+- **Financial Auditing**: "Cash Handed" and "Change" are now stored in the database for every transaction, enabling full cash-drawer reconciliation.
+- **Item Snapshots**: The POS now saves the exact name of items at the time of sale, ensuring receipts remain accurate even if inventory names change.
+- **Improved Receipt Layout**: Updated the physical and digital receipts to show cash handover details.
+
+## [1.3.2] - 2026-04-14
+### Added
+- **"NEW ITEM" Logic**: The inventory ledger now automatically identifies and labels the first stock entry for any product, distinguishing initial stock-up from subsequent restocks.
+- **Enhanced Transaction Summary**: The Transaction Report now includes a comprehensive footer summary calculating total Quantity, Cost, Revenue, Margin, and Average Unit Prices over the selected period.
+- **Professional Print Mode**: Completely overhauled print CSS (@media print) to ensure high-density tables (including Buy/Sell/Margin) fit perfectly on A4/Letter without cutting off.
+- **Financial Color Coding**: Inventory transactions now use Red/Negative (-) for purchases and Green/Positive (+) for sales to represent cash flow direction.
+
+### Changed
+- **Renaming**: Rebranded "Inventory Movements" to **Inventory Transactions** and "Custom Analytical Report" to **Transaction Report** for professional consistency.
+- **Action Menu Portal**: Refactored the 2x2 action menu to use React Portals, allowing it to "stand outside" table containers and prevent layout shifting or clipping.
+
+
+## [1.3.0] - 2026-04-14
 
 ## [1.2.1] - 2026-04-14
 ### Added

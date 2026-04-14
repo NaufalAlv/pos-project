@@ -4,7 +4,18 @@ import * as TransactionModel from '../models/Transaction';
 export const createTransaction = async (req: Request, res: Response) => {
     try {
         const user_id = (req as any).user.id; // From Auth Middleware
-        const { customer_id, items, total_amount, payment_method } = req.body;
+        const { 
+            customer_id, 
+            customer_name, 
+            customer_phone, 
+            items, 
+            total_amount, 
+            payment_method,
+            cash_handed,
+            cash_change,
+            adjustment_amount,
+            payment_status
+        } = req.body;
 
         // Simple Invoice Number Generation
         const invoice_number = `INV-${Date.now()}`;
@@ -13,8 +24,14 @@ export const createTransaction = async (req: Request, res: Response) => {
             invoice_number,
             user_id,
             customer_id,
+            customer_name,
+            customer_phone,
             total_amount,
             payment_method,
+            cash_handed,
+            cash_change,
+            adjustment_amount,
+            payment_status,
             items
         });
 

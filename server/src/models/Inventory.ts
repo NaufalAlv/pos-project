@@ -190,27 +190,32 @@ export const restockProduct = async (id: number, quantity: number, incomingBuyPr
 
 export const getProductHistory = async (productId: number) => {
     const stmt = db.prepare(`
-        SELECT 
-            'RESTOCK' as type,
-            quantity,
-            buy_price as price,
-            created_at,
-            NULL as invoice_number
-        FROM product_restocks
-        WHERE product_id = @id
+        SELECT * FROM (
+            SELECT 
+                CASE 
+                    WHEN ROW_NUMBER() OVER (PARTITION BY pr.product_id ORDER BY pr.created_at ASC) = 1 
+                    THEN 'NEW ITEM' 
+                    ELSE 'RESTOCK' 
+                END as type,
+                pr.quantity,
+                pr.buy_price as price,
+                pr.created_at,
+                NULL as invoice_number
+            FROM product_restocks pr
+            WHERE pr.product_id = @id
 
-        UNION ALL
+            UNION ALL
 
-        SELECT
-            'SALE' as type,
-            quantity * -1 as quantity,
-            price,
-            t.created_at,
-            t.invoice_number
-        FROM transaction_items ti
-        JOIN transactions t ON ti.transaction_id = t.id
-        WHERE ti.product_id = @id AND (t.is_deleted = 0 OR t.is_deleted IS NULL)
-
+            SELECT
+                'SALE' as type,
+                ti.quantity * -1 as quantity,
+                ti.price,
+                t.created_at,
+                t.invoice_number
+            FROM transaction_items ti
+            JOIN transactions t ON ti.transaction_id = t.id
+            WHERE ti.product_id = @id AND (t.is_deleted = 0 OR t.is_deleted IS NULL)
+        )
         ORDER BY created_at DESC
     `);
 
@@ -246,7 +251,11 @@ export const getGlobalInventoryHistory = async (filters: { categoryId?: string, 
     const query = `
         SELECT * FROM (
             SELECT 
-                'RESTOCK' as type,
+                CASE 
+                    WHEN ROW_NUMBER() OVER (PARTITION BY pr.product_id ORDER BY pr.created_at ASC) = 1 
+                    THEN 'NEW ITEM' 
+                    ELSE 'RESTOCK' 
+                END as type,
                 pr.quantity,
                 pr.buy_price as price,
                 pr.created_at,

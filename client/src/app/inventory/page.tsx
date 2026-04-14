@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
@@ -63,6 +64,7 @@ export default function InventoryPage() {
 
     // UI State for 2x2 Menu
     const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+    const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -525,7 +527,16 @@ export default function InventoryPage() {
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setActiveMenuId(activeMenuId === product.id ? null : product.id);
+                                                                    if (activeMenuId === product.id) {
+                                                                        setActiveMenuId(null);
+                                                                    } else {
+                                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                                        setMenuPosition({
+                                                                            top: rect.bottom + window.scrollY,
+                                                                            left: rect.right + window.scrollX
+                                                                        });
+                                                                        setActiveMenuId(product.id);
+                                                                    }
                                                                 }}
                                                                 className={cn(
                                                                     "h-8 w-8 rounded-lg flex items-center justify-center transition-colors",
@@ -535,13 +546,19 @@ export default function InventoryPage() {
                                                                 <MoreVertical size={18} />
                                                             </button>
 
-                                                            {activeMenuId === product.id && (
+                                                            {activeMenuId === product.id && typeof document !== 'undefined' && createPortal(
                                                                 <>
                                                                     <div
                                                                         className="fixed inset-0 z-60"
                                                                         onClick={() => setActiveMenuId(null)}
                                                                     />
-                                                                    <div className="absolute right-0 top-10 z-70 bg-white rounded-2xl shadow-2xl border border-border p-2 min-w-[160px] animate-in fade-in zoom-in duration-200">
+                                                                    <div 
+                                                                        className="fixed z-70 bg-white rounded-2xl shadow-2xl border border-border p-2 min-w-[160px] animate-in fade-in zoom-in duration-200"
+                                                                        style={{ 
+                                                                            top: `${menuPosition.top + 8 - window.scrollY}px`, 
+                                                                            left: `${menuPosition.left - 160 - window.scrollX}px` 
+                                                                        }}
+                                                                    >
                                                                         <div className="grid grid-cols-2 gap-2">
                                                                             <button
                                                                                 onClick={() => { openHistoryModal(product); setActiveMenuId(null); }}
@@ -577,7 +594,8 @@ export default function InventoryPage() {
                                                                             </button>
                                                                         </div>
                                                                     </div>
-                                                                </>
+                                                                </>,
+                                                                document.body
                                                             )}
                                                         </div>
                                                     </td>
@@ -750,29 +768,39 @@ export default function InventoryPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border/20">
-                                                {productHistory.map((entry, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="py-3 text-slate-500">
-                                                            {new Date(entry.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
-                                                        </td>
-                                                        <td className="py-3">
-                                                            <span className={cn(
-                                                                "px-2 py-0.5 rounded-md font-bold uppercase tracking-tight",
-                                                                entry.type === 'RESTOCK' ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
+                                                {productHistory.map((entry, idx) => {
+                                                    const isInflow = entry.type === 'NEW ITEM' || entry.type === 'RESTOCK';
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="py-3 text-slate-500">
+                                                                {new Date(entry.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                                                            </td>
+                                                            <td className="py-3">
+                                                                <span className={cn(
+                                                                    "px-2 py-0.5 rounded-md font-bold uppercase tracking-tight",
+                                                                    entry.type === 'NEW ITEM' ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
+                                                                    entry.type === 'RESTOCK' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : 
+                                                                    "bg-blue-50 text-blue-600 border border-blue-100"
+                                                                )}>
+                                                                    {entry.type}
+                                                                </span>
+                                                            </td>
+                                                            <td className={cn(
+                                                                "py-3 text-center font-bold",
+                                                                entry.quantity > 0 ? "text-emerald-600" : "text-blue-600"
                                                             )}>
-                                                                {entry.type}
-                                                            </span>
-                                                        </td>
-                                                        <td className={cn(
-                                                            "py-3 text-center font-bold",
-                                                            entry.quantity > 0 ? "text-emerald-600" : "text-blue-600"
-                                                        )}>
-                                                            {entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}
-                                                        </td>
-                                                        <td className="py-3 text-right font-medium">Rp {entry.price.toLocaleString()}</td>
-                                                        <td className="py-3 text-right font-mono text-slate-400">{entry.invoice_number || '-'}</td>
-                                                    </tr>
-                                                ))}
+                                                                {entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}
+                                                            </td>
+                                                            <td className={cn(
+                                                                "py-3 text-right font-bold",
+                                                                isInflow ? "text-red-500" : "text-emerald-600"
+                                                            )}>
+                                                                {isInflow ? '-' : '+'}Rp {entry.price.toLocaleString()}
+                                                            </td>
+                                                            <td className="py-3 text-right font-mono text-slate-400">{entry.invoice_number || '-'}</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     )}

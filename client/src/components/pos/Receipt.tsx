@@ -11,6 +11,9 @@ interface ReceiptProps {
         payment_method: string;
         total_amount: number;
         items: any[];
+        cash_handed?: number;
+        cash_change?: number;
+        adjustment_amount?: number;
     };
     onClose: () => void;
 }
@@ -59,6 +62,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ transaction, onClose }) => {
                         <div class="flex"><span>Date:</span><span>${dateStr}</span></div>
                         <div class="flex"><span>Cashier:</span><span>Admin</span></div>
                         ${transaction.customer_name ? `<div class="flex"><span>Customer:</span><b>${transaction.customer_name}</b></div>` : ''}
+                        ${transaction.customer_phone ? `<div class="flex"><span>Phone:</span><span>${transaction.customer_phone}</span></div>` : ''}
                         <div class="flex"><span>Payment:</span><b>${transaction.payment_method.toUpperCase()}</b></div>
                     </div>
                     <div class="dashed"></div>
@@ -74,8 +78,13 @@ export const Receipt: React.FC<ReceiptProps> = ({ transaction, onClose }) => {
                     </table>
                     <div class="details">
                         <div class="flex"><span>Subtotal</span><span>Rp ${subtotal.toLocaleString()}</span></div>
-                        <div class="flex"><span>PPN (11%)</span><span>Rp ${tax.toLocaleString()}</span></div>
+                        <div class="flex"><span>PPN (0%)</span><span>Rp 0</span></div>
+                        ${transaction.adjustment_amount ? `<div class="flex"><span>Adjustment</span><span>Rp ${transaction.adjustment_amount.toLocaleString()}</span></div>` : ''}
                         <div class="flex total"><span>TOTAL</span><span>Rp ${transaction.total_amount.toLocaleString()}</span></div>
+                        ${transaction.cash_handed ? `
+                        <div class="flex" style="margin-top: 4px;"><span>Handed</span><span>Rp ${transaction.cash_handed.toLocaleString()}</span></div>
+                        <div class="flex font-bold"><span>Change</span><span>Rp ${transaction.cash_change?.toLocaleString()}</span></div>
+                        ` : ''}
                     </div>
                     <div class="dashed" style="margin-top: 16px;"></div>
                     <p style="font-style: italic;">Thank you for trusting our workshop!</p>
@@ -99,7 +108,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ transaction, onClose }) => {
     };
 
     const subtotal = transaction.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const tax = subtotal * 0.11;
+    const tax = 0; // Disable tax for now as per dashboard logic
 
     return (
         <div id="receipt-modal-root" className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 print:bg-white print:static print:inset-auto">
@@ -141,9 +150,12 @@ export const Receipt: React.FC<ReceiptProps> = ({ transaction, onClose }) => {
                             <span>Admin</span>
                         </div>
                         {transaction.customer_name && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-start">
                                 <span>Customer:</span>
-                                <span className="font-bold uppercase italic">{transaction.customer_name}</span>
+                                <div className="text-right">
+                                    <p className="font-bold uppercase italic">{transaction.customer_name}</p>
+                                    {transaction.customer_phone && <p className="opacity-50 text-[10px]">{transaction.customer_phone}</p>}
+                                </div>
                             </div>
                         )}
                         <div className="flex justify-between capitalize">
@@ -178,14 +190,28 @@ export const Receipt: React.FC<ReceiptProps> = ({ transaction, onClose }) => {
                             <span>Subtotal</span>
                             <span>Rp {subtotal.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span>PPN (11%)</span>
-                            <span>Rp {tax.toLocaleString()}</span>
-                        </div>
+                        {transaction.adjustment_amount ? (
+                            <div className="flex justify-between italic text-slate-500">
+                                <span>Adjustment</span>
+                                <span>Rp {transaction.adjustment_amount.toLocaleString()}</span>
+                            </div>
+                        ) : null}
                         <div className="flex justify-between text-base font-black border-t border-dashed border-gray-300 pt-2 font-sans tracking-wide underline decoration-double">
                             <span className="uppercase">TOTAL</span>
                             <span>Rp {transaction.total_amount.toLocaleString()}</span>
                         </div>
+                        {transaction.cash_handed && transaction.cash_handed > 0 && (
+                            <div className="pt-2 border-t border-gray-100 bg-slate-50 p-2 rounded-lg mt-2">
+                                <div className="flex justify-between">
+                                    <span>Cash Handed</span>
+                                    <span>Rp {transaction.cash_handed.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-emerald-600 mt-1">
+                                    <span>Change</span>
+                                    <span>Rp {transaction.cash_change?.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="w-full border-t border-dashed border-gray-300 my-4"></div>

@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
-import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
@@ -24,8 +24,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Inventory', href: '/inventory', icon: Package },
         { name: 'POS', href: '/pos', icon: ShoppingCart },
+        { name: 'Inventory', href: '/inventory', icon: Package },
+        { name: 'Customers', href: '/customers', icon: User },
+        { name: 'Transactions', href: '/transactions', icon: FileText },
         { name: 'Reports', href: '/reports', icon: FileText },
         { name: 'Settings', href: '/settings', icon: Settings },
     ];
