@@ -187,3 +187,101 @@ export const restockProduct = async (id: number, quantity: number, incomingBuyPr
 
     executeRestock(id, quantity, incomingBuyPrice);
 };
+
+export const getProductHistory = async (productId: number) => {
+    const stmt = db.prepare(`
+        SELECT 
+            'RESTOCK' as type,
+            quantity,
+            buy_price as price,
+            created_at,
+            NULL as invoice_number
+        FROM product_restocks
+        WHERE product_id = @id
+
+        UNION ALL
+
+        SELECT
+            'SALE' as type,
+            quantity * -1 as quantity,
+            price,
+            t.created_at,
+            t.invoice_number
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.id
+        WHERE ti.product_id = @id AND (t.is_deleted = 0 OR t.is_deleted IS NULL)
+
+        ORDER BY created_at DESC
+    `);
+
+    return stmt.all({ id: productId });
+};
+
+export const getGlobalInventoryHistory = async (filters: { categoryId?: string, startDate?: string, endDate?: string, search?: string }) => {
+    let whereClauses = ['1=1'];
+    let params: any = {};
+
+    if (filters.categoryId && filters.categoryId !== 'all') {
+        whereClauses.push('h.category_id = @categoryId');
+        params.categoryId = filters.categoryId;
+    }
+
+    if (filters.startDate) {
+        whereClauses.push('date(h.created_at) >= date(@startDate)');
+        params.startDate = filters.startDate;
+    }
+
+    if (filters.endDate) {
+        whereClauses.push('date(h.created_at) <= date(@endDate)');
+        params.endDate = filters.endDate;
+    }
+
+    if (filters.search) {
+        whereClauses.push('(LOWER(h.product_name) LIKE @search OR LOWER(h.sku) LIKE @search)');
+        params.search = `%${filters.search.toLowerCase()}%`;
+    }
+
+    const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const query = `
+        SELECT * FROM (
+            SELECT 
+                'RESTOCK' as type,
+                pr.quantity,
+                pr.buy_price as price,
+                pr.created_at,
+                NULL as invoice_number,
+                p.name as product_name,
+                p.sku,
+                p.category_id,
+                c.name as category_name
+            FROM product_restocks pr
+            JOIN products p ON pr.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+
+            UNION ALL
+
+            SELECT
+                'SALE' as type,
+                ti.quantity * -1 as quantity,
+                ti.price,
+                t.created_at,
+                t.invoice_number,
+                p.name as product_name,
+                p.sku,
+                p.category_id,
+                c.name as category_name
+            FROM transaction_items ti
+            JOIN transactions t ON ti.transaction_id = t.id
+            JOIN products p ON ti.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE (t.is_deleted = 0 OR t.is_deleted IS NULL)
+        ) h
+        ${whereString}
+        ORDER BY h.created_at DESC
+    `;
+
+    const stmt = db.prepare(query);
+    return stmt.all(params);
+};
+

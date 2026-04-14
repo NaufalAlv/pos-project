@@ -54,15 +54,15 @@ export const createTransaction = async (transaction: Transaction): Promise<numbe
         const transactionId = txInfo.lastInsertRowid;
 
         // 3. Process Items (Insert Item & Deduct Stock)
-        const checkStockStmt = db.prepare('SELECT stock FROM products WHERE id = @product_id');
+        const checkStockStmt = db.prepare('SELECT stock, buy_price FROM products WHERE id = @product_id');
         const updateStockStmt = db.prepare('UPDATE products SET stock = stock - @quantity WHERE id = @product_id');
         const insertItemStmt = db.prepare(`
-            INSERT INTO transaction_items (transaction_id, product_id, quantity, price, subtotal) 
-            VALUES (@transaction_id, @product_id, @quantity, @price, @subtotal)
+            INSERT INTO transaction_items (transaction_id, product_id, quantity, price, buy_price, subtotal) 
+            VALUES (@transaction_id, @product_id, @quantity, @price, @buy_price, @subtotal)
         `);
 
         for (const item of txData.items) {
-            const product = checkStockStmt.get({ product_id: item.product_id }) as { stock: number } | undefined;
+            const product = checkStockStmt.get({ product_id: item.product_id }) as { stock: number, buy_price: number } | undefined;
             if (!product) throw new Error(`Product ${item.product_id} not found`);
             if (product.stock < item.quantity) throw new Error(`Insufficient stock for product ${item.product_id}`);
 
@@ -73,6 +73,7 @@ export const createTransaction = async (transaction: Transaction): Promise<numbe
                 product_id: item.product_id,
                 quantity: item.quantity,
                 price: item.price,
+                buy_price: product.buy_price,
                 subtotal: item.quantity * item.price
             });
         }

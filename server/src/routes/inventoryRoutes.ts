@@ -15,5 +15,7 @@ router.post('/products', authenticateToken, inventoryController.createProduct);
 router.put('/products/:id', authenticateToken, inventoryController.updateProduct);
 router.delete('/products/:id', authenticateToken, inventoryController.deleteProduct);
 router.post('/products/:id/restock', authenticateToken, inventoryController.restockProduct);
+router.get('/products/:id/history', authenticateToken, inventoryController.getProductHistory);
+router.get('/history/global', authenticateToken, inventoryController.getGlobalHistory);
 
 export default router;

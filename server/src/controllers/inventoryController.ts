@@ -79,3 +79,30 @@ export const restockProduct = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Error restocking product', error });
     }
 };
+
+export const getProductHistory = async (req: Request, res: Response) => {
+    try {
+        const history = await InventoryModel.getProductHistory(Number(req.params.id));
+        res.json(history);
+    } catch (error) {
+        console.error('Error in getProductHistory controller:', error);
+        res.status(500).json({ message: 'Error fetching product history', error });
+    }
+};
+
+export const getGlobalHistory = async (req: Request, res: Response) => {
+    try {
+        const filters = {
+            categoryId: req.query.categoryId as string,
+            startDate: req.query.startDate as string,
+            endDate: req.query.endDate as string,
+            search: req.query.search as string
+        };
+        const history = await InventoryModel.getGlobalInventoryHistory(filters);
+        res.json(history);
+    } catch (error) {
+        console.error('Error in getGlobalHistory controller:', error);
+        res.status(500).json({ message: 'Error fetching global inventory history', error });
+    }
+};
+

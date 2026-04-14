@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0] - 2026-04-14
+### Added
+- **Global Inventory Movements**: New dedicated page for viewing all stock transactions across the shop.
+- **Advanced Filtering & Sorting**: Both Inventory and History pages now support searching, category filtering, and clickable column headers for sorting (High ↔ Low).
+- **UI Refactor (Action Menu)**: Replaced row action buttons with a single `MoreVertical` (triple dots) button that opens a compact 2x2 clustered icon menu for History, Restock, Edit, and Delete.
+- **Navigation**: Added "View All Movements" shortcut to the Inventory dashboard.
+
+## [1.2.1] - 2026-04-14
+### Added
+- **Stock Ledger History**: Added a detailed movement log for products.
+- New "History" action button in Inventory table which opens a chronological timeline of all stock-in (Restocks) and stock-out (Sales) events including quantity, price, and invoice references.
+
+## [1.2.0] - 2026-04-14
+### Added
+- **Custom Report Generation**: Completely overhauled the `/reports` dashboard.
+- **Granular Data Engine**: Reports now breakdown sales at the item level to calculate historically accurate margins via saved `buy_price`.
+- **Analytics Filters**: Added extensive filter controls (Date Presets, Specific Payment Methods, Specific Categories).
+- **Analytical Metrics**: Report results now display aggregated performance summaries (Total Items, Total Revenue, Net Profit) alongside the itemized table.
+
 ## [1.1.2] - 2026-04-14
 ### Added
 - **Inventory Restock Logger**: Added a dedicated `product_restocks` table to track incoming stock and historical buy prices.

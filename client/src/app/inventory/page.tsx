@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import api from '@/utils/api';
-import { Plus, Search, Edit, Trash2, Package, Filter, MoreVertical, Coins, Boxes, Layers, ClipboardList } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, Filter, MoreVertical, Coins, Boxes, Layers, ClipboardList, History, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import Link from 'next/link';
 
 interface Product {
     id: number;
@@ -16,6 +17,7 @@ interface Product {
     sku: string;
     stock: number;
     price: number;
+    buy_price?: number;
     category_name?: string;
 }
 
@@ -31,6 +33,12 @@ export default function InventoryPage() {
     const [restockingProduct, setRestockingProduct] = useState<Product | null>(null);
     const [restockForm, setRestockForm] = useState({ quantity: 0, buy_price: 0 });
 
+    // History State
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+    const [productHistory, setProductHistory] = useState<any[]>([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
     // Categories State
     const [categories, setCategories] = useState<any[]>([]);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -44,6 +52,17 @@ export default function InventoryPage() {
         activeCategories: 0,
         totalProducts: 0
     });
+
+    // Filtering & Sorting State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Product; direction: 'asc' | 'desc' } | null>({
+        key: 'name',
+        direction: 'asc'
+    });
+
+    // UI State for 2x2 Menu
+    const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -113,6 +132,51 @@ export default function InventoryPage() {
         setFormData({ name: '', description: '', sku: '', stock: 0, price: 0, buy_price: 0, category_id: '' });
     };
 
+    // Filtered and Sorted Products
+    const filteredProducts = React.useMemo(() => {
+        return products.filter(product => {
+            const matchesSearch = searchTerm === '' ||
+                product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesCategory = selectedCategory === 'all' || product.category_name === selectedCategory;
+            return matchesSearch && matchesCategory;
+        });
+    }, [products, searchTerm, selectedCategory]);
+
+    const sortedProducts = React.useMemo(() => {
+        let sortableProducts = [...filteredProducts];
+        if (sortConfig !== null) {
+            sortableProducts.sort((a, b) => {
+                const aValue = a[sortConfig.key] ?? '';
+                const bValue = b[sortConfig.key] ?? '';
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableProducts;
+    }, [filteredProducts, sortConfig]);
+
+    const requestSort = (key: keyof Product) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: keyof Product) => {
+        if (!sortConfig || sortConfig.key !== key) return <ArrowUpDown size={14} className="ml-1 opacity-20" />;
+        return sortConfig.direction === 'asc' ?
+            <ArrowUp size={14} className="ml-1 text-primary" /> :
+            <ArrowDown size={14} className="ml-1 text-primary" />;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -120,7 +184,7 @@ export default function InventoryPage() {
         try {
             // Simulated loading delay
             await new Promise(r => setTimeout(r, 600));
-            
+
             const payload = {
                 ...formData,
                 category_id: formData.category_id ? Number(formData.category_id) : null
@@ -138,7 +202,7 @@ export default function InventoryPage() {
         } catch (err: any) {
             console.error('Failed to save product', err);
             const serverMessage = err.response?.data?.error?.message || err.response?.data?.message || '';
-            
+
             if (serverMessage.includes('PRODUCT_NAME_DUPLICATE')) {
                 setError('DUPLICATE NAME: An item with this name already exists.');
             } else if (serverMessage.includes('SKU_DUPLICATE')) {
@@ -191,6 +255,20 @@ export default function InventoryPage() {
         }
     };
 
+    const openHistoryModal = async (product: Product) => {
+        setHistoryProduct(product);
+        setIsHistoryModalOpen(true);
+        setIsHistoryLoading(true);
+        try {
+            const res = await api.get(`/inventory/products/${product.id}/history`);
+            setProductHistory(res.data);
+        } catch (error) {
+            console.error('Failed to fetch product history', error);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
@@ -228,7 +306,14 @@ export default function InventoryPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
                             <h1 className="text-3xl font-heading text-neutral">Inventory Management</h1>
-                            <p className="text-slate-500 mt-1">Track and manage your workshop supplies and parts.</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-slate-500">Track and manage your workshop supplies and parts.</p>
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                <Link href="/inventory/history" className="text-primary font-bold text-sm hover:underline flex items-center gap-1 group">
+                                    <History size={14} className="group-hover:rotate-45 transition-transform" />
+                                    View All Movements
+                                </Link>
+                            </div>
                         </div>
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)}>
@@ -331,39 +416,62 @@ export default function InventoryPage() {
                                 <input
                                     type="text"
                                     placeholder="Search products by name or SKU..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all outline-none text-sm"
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" className="bg-white">
-                                    <Filter className="mr-2 h-4 w-4" />
-                                    Filter
-                                </Button>
-                                <Button variant="outline" size="sm" className="bg-white">
-                                    Category
-                                </Button>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-border">
+                                    <div className="pl-3 pr-1 py-1 text-slate-400">
+                                        <Filter size={14} />
+                                    </div>
+                                    <select
+                                        className="bg-transparent text-sm font-medium text-slate-600 outline-none pr-3 py-1.5 cursor-pointer max-w-[150px]"
+                                        value={selectedCategory}
+                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                    >
+                                        <option value="all">All Categories</option>
+                                        {categories.map(c => (
+                                            <option key={c.id} value={c.name}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </CardHeader>
 
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
+                                <table className="w-full text-left text-sm table-fixed min-w-[800px]">
                                     <thead>
                                         <tr className="border-b border-border/50 text-slate-400 font-bold uppercase text-[10px] tracking-widest">
-                                            <th className="px-6 py-4">Product Details</th>
-                                            <th className="px-6 py-4">Category</th>
-                                            <th className="px-6 py-4">Stock Level</th>
-                                            <th className="px-6 py-4">Selling Price</th>
-                                            <th className="px-6 py-4 text-right">Actions</th>
+                                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors w-[30%]" onClick={() => requestSort('name')}>
+                                                <div className="flex items-center">Product Details {getSortIcon('name')}</div>
+                                            </th>
+                                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => requestSort('category_name')}>
+                                                <div className="flex items-center">Category {getSortIcon('category_name')}</div>
+                                            </th>
+                                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => requestSort('stock')}>
+                                                <div className="flex items-center">Stock Level {getSortIcon('stock')}</div>
+                                            </th>
+                                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => requestSort('buy_price')}>
+                                                <div className="flex items-center">Avg. Buy Price {getSortIcon('buy_price')}</div>
+                                            </th>
+                                            <th className="px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => requestSort('price')}>
+                                                <div className="flex items-center">Selling Price {getSortIcon('price')}</div>
+                                            </th>
+                                            <th className="px-6 py-4 text-right w-[100px]">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/50">
-                                        {loading ? (
-                                            <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">Fetching inventory data...</td></tr>
-                                        ) : products.length === 0 ? (
-                                            <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No products in inventory.</td></tr>
+                                        {(loading || sortedProducts.length === 0) ? (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-20 text-center text-slate-400">
+                                                    {loading ? 'Fetching inventory data...' : 'No products found match your search.'}
+                                                </td>
+                                            </tr>
                                         ) : (
-                                            products.map((product) => (
+                                            sortedProducts.map((product) => (
                                                 <tr key={product.id} className="hover:bg-slate-50/50 group transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center space-x-3">
@@ -395,18 +503,82 @@ export default function InventoryPage() {
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 font-bold text-neutral">Rp {product.price.toLocaleString()}</td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex justify-end space-x-1">
-                                                            <Button onClick={() => openRestockModal(product)} variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-500" title="Restock Item">
-                                                                <Plus size={16} />
-                                                            </Button>
-                                                            <Button onClick={() => openEditModal(product)} variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-primary" title="Edit Item">
-                                                                <Edit size={16} />
-                                                            </Button>
-                                                            <Button onClick={() => handleDelete(product.id)} variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-red-500" title="Delete Item">
-                                                                <Trash2 size={16} />
-                                                            </Button>
+                                                    <td className="px-6 py-4 font-bold text-slate-500">
+                                                        Rp {(product.buy_price || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className={cn(
+                                                                "h-1.5 w-1.5 rounded-full",
+                                                                product.price > (product.buy_price || 0) ? "bg-emerald-500" : (product.price === (product.buy_price || 0) ? "bg-yellow-500" : "bg-red-500")
+                                                            )} />
+                                                            <span className={cn(
+                                                                "font-bold",
+                                                                product.price > (product.buy_price || 0) ? "text-emerald-600" : (product.price === (product.buy_price || 0) ? "text-yellow-600" : "text-red-500")
+                                                            )}>
+                                                                Rp {product.price.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right relative">
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(activeMenuId === product.id ? null : product.id);
+                                                                }}
+                                                                className={cn(
+                                                                    "h-8 w-8 rounded-lg flex items-center justify-center transition-colors",
+                                                                    activeMenuId === product.id ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-100"
+                                                                )}
+                                                            >
+                                                                <MoreVertical size={18} />
+                                                            </button>
+
+                                                            {activeMenuId === product.id && (
+                                                                <>
+                                                                    <div
+                                                                        className="fixed inset-0 z-60"
+                                                                        onClick={() => setActiveMenuId(null)}
+                                                                    />
+                                                                    <div className="absolute right-0 top-10 z-70 bg-white rounded-2xl shadow-2xl border border-border p-2 min-w-[160px] animate-in fade-in zoom-in duration-200">
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <button
+                                                                                onClick={() => { openHistoryModal(product); setActiveMenuId(null); }}
+                                                                                className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-blue-50 text-blue-600 transition-colors group w-full aspect-square"
+                                                                                title="View History"
+                                                                            >
+                                                                                <History size={20} className="group-hover:scale-110 transition-transform" />
+                                                                                <span className="text-[10px] mt-1 font-bold">History</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { openRestockModal(product); setActiveMenuId(null); }}
+                                                                                className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-emerald-50 text-emerald-600 transition-colors group w-full aspect-square"
+                                                                                title="Add Stock"
+                                                                            >
+                                                                                <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                                                                                <span className="text-[10px] mt-1 font-bold">Restock</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { openEditModal(product); setActiveMenuId(null); }}
+                                                                                className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors group w-full aspect-square"
+                                                                                title="Edit Product"
+                                                                            >
+                                                                                <Edit size={20} className="group-hover:scale-110 transition-transform" />
+                                                                                <span className="text-[10px] mt-1 font-bold">Edit</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { handleDelete(product.id); setActiveMenuId(null); }}
+                                                                                className="flex flex-col items-center justify-center p-3 rounded-xl hover:bg-red-50 text-red-600 transition-colors group w-full aspect-square"
+                                                                                title="Delete Item"
+                                                                            >
+                                                                                <Trash2 size={20} className="group-hover:scale-110 transition-transform" />
+                                                                                <span className="text-[10px] mt-1 font-bold">Delete</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -427,7 +599,7 @@ export default function InventoryPage() {
                                 <CardTitle className="text-2xl font-heading">{editingProduct ? 'Edit Product' : 'Add New Product'}</CardTitle>
                                 <CardDescription>Enter the details for this inventory item.</CardDescription>
                             </CardHeader>
-                            
+
                             <CardContent className="pt-6">
                                 {error && (
                                     <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold animate-pulse">
@@ -451,7 +623,7 @@ export default function InventoryPage() {
                                             disabled={!!editingProduct}
                                             value={formData.sku}
                                             onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                                            placeholder="AUTO-GEN"
+                                            placeholder="Barcode"
                                         />
                                         <div className="flex flex-col space-y-1.5">
                                             <label className="text-sm font-bold text-slate-700">Product Category</label>
@@ -549,6 +721,70 @@ export default function InventoryPage() {
                     </div>
                 )}
 
+                {/* History Modal */}
+                {isHistoryModalOpen && historyProduct && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral/80 backdrop-blur-sm p-4 animate-in">
+                        <Card className="w-full max-w-2xl shadow-2xl border-white/20">
+                            <CardHeader className="border-b border-border/50 pb-6 flex justify-between flex-row items-center">
+                                <div>
+                                    <CardTitle className="text-2xl font-heading">Stock Ledger History</CardTitle>
+                                    <CardDescription>{historyProduct.name} ({historyProduct.sku})</CardDescription>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setIsHistoryModalOpen(false)}>✕</Button>
+                            </CardHeader>
+                            <CardContent className="pt-6">
+                                <div className="max-h-96 overflow-y-auto pr-2">
+                                    {isHistoryLoading ? (
+                                        <div className="py-20 text-center text-slate-400 italic">Loading ledger...</div>
+                                    ) : productHistory.length === 0 ? (
+                                        <div className="py-20 text-center text-slate-400 italic">No movement recorded yet.</div>
+                                    ) : (
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="sticky top-0 bg-white border-b border-border/50 text-slate-400 font-bold uppercase tracking-widest z-10">
+                                                <tr>
+                                                    <th className="pb-3">Date & Time</th>
+                                                    <th className="pb-3">Type</th>
+                                                    <th className="pb-3 text-center">Qty</th>
+                                                    <th className="pb-3 text-right">Unit Price</th>
+                                                    <th className="pb-3 text-right">Reference</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border/20">
+                                                {productHistory.map((entry, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="py-3 text-slate-500">
+                                                            {new Date(entry.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                                                        </td>
+                                                        <td className="py-3">
+                                                            <span className={cn(
+                                                                "px-2 py-0.5 rounded-md font-bold uppercase tracking-tight",
+                                                                entry.type === 'RESTOCK' ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
+                                                            )}>
+                                                                {entry.type}
+                                                            </span>
+                                                        </td>
+                                                        <td className={cn(
+                                                            "py-3 text-center font-bold",
+                                                            entry.quantity > 0 ? "text-emerald-600" : "text-blue-600"
+                                                        )}>
+                                                            {entry.quantity > 0 ? `+${entry.quantity}` : entry.quantity}
+                                                        </td>
+                                                        <td className="py-3 text-right font-medium">Rp {entry.price.toLocaleString()}</td>
+                                                        <td className="py-3 text-right font-mono text-slate-400">{entry.invoice_number || '-'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                                <div className="mt-6 flex justify-end">
+                                    <Button variant="outline" onClick={() => setIsHistoryModalOpen(false)}>Close Ledger</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Categories Management Modal */}
                 {isCategoryModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral/80 backdrop-blur-sm p-4 animate-in">
@@ -575,7 +811,7 @@ export default function InventoryPage() {
                                             <span className={cn("font-medium", cat.is_active === 0 ? "text-slate-400 line-through" : "text-neutral")}>
                                                 {cat.name}
                                             </span>
-                                            <Button 
+                                            <Button
                                                 variant={cat.is_active === 0 ? "primary" : "outline"}
                                                 size="sm"
                                                 className={cn("h-8 px-3 text-xs", cat.is_active === 0 ? "" : "text-red-500 border-red-200 hover:bg-red-50")}

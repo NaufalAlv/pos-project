@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     product_id INTEGER,
     quantity INTEGER NOT NULL,
     price REAL NOT NULL,
+    buy_price REAL DEFAULT 0,
     subtotal REAL NOT NULL,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL

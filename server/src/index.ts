@@ -21,6 +21,8 @@ console.log('Loading analytics routes...');
 import analyticsRoutes from './routes/analyticsRoutes';
 console.log('Loading user routes...');
 import userRoutes from './routes/userRoutes';
+console.log('Loading report routes...');
+import reportRoutes from './routes/reportRoutes';
 console.log('All routes loaded.');
 
 app.use(cors());
@@ -39,6 +41,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.get('/', (req: Request, res: Response) => {
     res.send('POS-Bengkel API is running');
