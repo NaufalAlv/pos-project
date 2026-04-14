@@ -32,7 +32,28 @@ const seed = async () => {
             console.log(`Password: ${password}`);
             console.log('------------------------------------------------');
         } else {
-            console.log('Users already exist. Skipping seed.');
+            console.log('Users already exist. Skipping user seed.');
+        }
+
+        // Check if categories exist
+        const checkCatStmt = db.prepare('SELECT * FROM categories LIMIT 1');
+        if (!checkCatStmt.get()) {
+            console.log('No categories found. Creating default categories...');
+            const insertCat = db.prepare('INSERT INTO categories (name, description) VALUES (?, ?)');
+            insertCat.run('Parts', 'Workshop spare parts and components');
+            insertCat.run('Tools', 'Hand tools and machinery');
+            insertCat.run('Services', 'Labor and maintenance services');
+            console.log('Default categories created.');
+        }
+
+        // Check if products exist
+        const checkProdStmt = db.prepare('SELECT * FROM products LIMIT 1');
+        if (!checkProdStmt.get()) {
+            console.log('No products found. Creating sample product...');
+            const partsCat = db.prepare('SELECT id FROM categories WHERE name = ?').get('Parts') as { id: number };
+            const insertProd = db.prepare('INSERT INTO products (name, sku, price, stock, category_id) VALUES (?, ?, ?, ?, ?)');
+            insertProd.run('Universal Oil Filter', 'SKU-OIL-001', 75000, 50, partsCat.id);
+            console.log('Sample product created.');
         }
 
         process.exit(0);
