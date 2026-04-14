@@ -36,6 +36,42 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     };
 };
 
+export interface InventoryStats {
+    totalValuation: number;
+    totalStock: number;
+    activeCategories: number;
+    totalProducts: number;
+}
+
+export const getInventoryStats = async (): Promise<InventoryStats> => {
+    // 1. Total Valuation (SUM stock * buy_price)
+    const valuationStmt = db.prepare('SELECT SUM(stock * buy_price) as total FROM products');
+    const valuationResult = valuationStmt.get() as { total: number | null };
+    const totalValuation = valuationResult?.total || 0;
+
+    // 2. Total Items Stored (SUM stock)
+    const stockStmt = db.prepare('SELECT SUM(stock) as total FROM products');
+    const stockResult = stockStmt.get() as { total: number | null };
+    const totalStock = stockResult?.total || 0;
+
+    // 3. Active Categories Count
+    const categoriesStmt = db.prepare('SELECT COUNT(*) as count FROM categories WHERE is_active = 1');
+    const categoriesResult = categoriesStmt.get() as { count: number | null };
+    const activeCategories = categoriesResult?.count || 0;
+
+    // 4. Total Different Products
+    const productsStmt = db.prepare('SELECT COUNT(*) as count FROM products');
+    const productsResult = productsStmt.get() as { count: number | null };
+    const totalProducts = productsResult?.count || 0;
+
+    return {
+        totalValuation,
+        totalStock,
+        activeCategories,
+        totalProducts
+    };
+};
+
 export const getRecentActivity = async (): Promise<any[]> => {
     const stmt = db.prepare(`
         SELECT t.id, t.invoice_number, t.total_amount, t.created_at, u.username 

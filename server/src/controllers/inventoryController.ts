@@ -19,6 +19,15 @@ export const createCategory = async (req: Request, res: Response) => {
     }
 };
 
+export const toggleCategory = async (req: Request, res: Response) => {
+    try {
+        await InventoryModel.toggleCategoryStatus(Number(req.params.id));
+        res.json({ message: 'Category status toggled' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error toggling category', error });
+    }
+};
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const products = await InventoryModel.getAllProducts();
@@ -54,5 +63,19 @@ export const deleteProduct = async (req: Request, res: Response) => {
         res.json({ message: 'Product deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting product', error });
+    }
+};
+
+export const restockProduct = async (req: Request, res: Response) => {
+    try {
+        const { quantity, buy_price } = req.body;
+        if (!quantity || !buy_price) {
+            return res.status(400).json({ message: 'Quantity and buy_price are required' });
+        }
+        await InventoryModel.restockProduct(Number(req.params.id), Number(quantity), Number(buy_price));
+        res.json({ message: 'Product restocked successfully' });
+    } catch (error) {
+        console.error('Error in restockProduct controller:', error);
+        res.status(500).json({ message: 'Error restocking product', error });
     }
 };

@@ -5,5 +5,7 @@ import * as analyticsController from '../controllers/analyticsController';
 const router = Router();
 
 router.get('/dashboard', authenticateToken, analyticsController.getDashboardData);
+router.get('/health', authenticateToken, analyticsController.getHealthStatus);
+router.get('/inventory', authenticateToken, analyticsController.getInventoryStats);
 
 export default router;

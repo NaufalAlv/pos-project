@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import api from '@/utils/api';
+import { useRouter } from 'next/navigation';
 import { 
     TrendingUp, 
     ShoppingCart, 
@@ -25,6 +26,11 @@ export default function DashboardPage() {
         lowStockCount: 0
     });
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
+    
+    // Health status
+    const [health, setHealth] = useState({ status: 'offline', database: 'unknown', network: 'unknown' });
+    
+    const router = useRouter();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -36,7 +42,21 @@ export default function DashboardPage() {
                 console.error('Failed to fetch dashboard data', error);
             }
         };
+
+        const fetchHealth = async () => {
+            try {
+                const res = await api.get('/analytics/health');
+                setHealth(res.data);
+            } catch (error) {
+                setHealth({ status: 'offline', database: 'disconnected', network: 'unknown' });
+            }
+        };
+
         fetchData();
+        fetchHealth();
+        
+        const healthInterval = setInterval(fetchHealth, 10000);
+        return () => clearInterval(healthInterval);
     }, []);
 
     const statConfig = [
@@ -84,11 +104,11 @@ export default function DashboardPage() {
                             <p className="text-slate-500 mt-1">Real-time workshop performance metrics.</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <Button variant="outline" size="sm" className="bg-white">
+                            <Button variant="outline" size="sm" className="bg-white pointer-events-none">
                                 <Clock className="mr-2 h-4 w-4" />
-                                Today
+                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </Button>
-                            <Button variant="primary" size="sm">
+                            <Button variant="primary" size="sm" onClick={() => router.push('/reports')}>
                                 <TrendingUp className="mr-2 h-4 w-4" />
                                 Generate Report
                             </Button>
@@ -124,7 +144,7 @@ export default function DashboardPage() {
                                     <CardTitle>Recent Activity</CardTitle>
                                     <CardDescription>Latest workshop transactions and service orders</CardDescription>
                                 </div>
-                                <Button variant="ghost" size="sm" className="text-primary font-bold">
+                                <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => router.push('/reports')}>
                                     View All <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
                             </CardHeader>
@@ -188,15 +208,15 @@ export default function DashboardPage() {
                                     <CardDescription className="text-white/70">Common workshop tasks</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
-                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20">
+                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20" onClick={() => router.push('/pos')}>
                                         <ShoppingCart className="mr-3 h-5 w-5" />
                                         New Transaction
                                     </Button>
-                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20">
+                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20" onClick={() => router.push('/inventory')}>
                                         <Hammer className="mr-3 h-5 w-5" />
                                         Add Inventory
                                     </Button>
-                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20">
+                                    <Button variant="glass" className="w-full justify-start text-white border-white/20 hover:bg-white/20" onClick={() => router.push('/settings')}>
                                         <Users className="mr-3 h-5 w-5" />
                                         Manage Staff
                                     </Button>
@@ -210,17 +230,21 @@ export default function DashboardPage() {
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 mr-3 animate-pulse" />
+                                            <div className={cn("h-2 w-2 rounded-full mr-3 animate-pulse", health.status === 'online' ? "bg-emerald-500" : "bg-red-500")} />
                                             <span className="text-sm font-medium text-slate-600">Database Connection</span>
                                         </div>
-                                        <span className="text-xs font-bold text-emerald-600">Online</span>
+                                        <span className={cn("text-xs font-bold uppercase", health.status === 'online' ? "text-emerald-600" : "text-red-500")}>
+                                            {health.database || 'Connecting...'}
+                                        </span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500 mr-3 animate-pulse" />
+                                            <div className={cn("h-2 w-2 rounded-full mr-3 animate-pulse", health.status === 'online' ? "bg-emerald-500" : "bg-red-500")} />
                                             <span className="text-sm font-medium text-slate-600">Network Broadcaster</span>
                                         </div>
-                                        <span className="text-xs font-bold text-emerald-600">Broadcasting</span>
+                                        <span className={cn("text-xs font-bold uppercase", health.status === 'online' ? "text-emerald-600" : "text-red-500")}>
+                                            {health.network || 'Unknown'}
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>

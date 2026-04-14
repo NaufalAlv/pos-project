@@ -44,7 +44,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
                     <div className="flex flex-col">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">System Time</span>
                         <span className="text-sm font-bold text-neutral font-mono leading-none">
-                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            {`${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')} ${currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`}
                         </span>
                     </div>
                 </div>

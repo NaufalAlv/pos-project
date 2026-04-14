@@ -14,6 +14,7 @@ interface Product {
     price: number;
     stock: number;
     sku: string;
+    category_is_active?: number;
 }
 
 interface CartItem extends Product {
@@ -25,7 +26,8 @@ export default function POSPage() {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-    
+    const [isActionLoading, setIsActionLoading] = useState(false);
+
     // Checkout State
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
@@ -78,12 +80,16 @@ export default function POSPage() {
     };
 
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    const tax = subtotal * 0.11; // 11% PPN
-    const total = subtotal + tax;
+    // const tax = subtotal * 0.11; // 11% PPN
+    const total = subtotal;
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
+        setIsActionLoading(true);
         try {
+            // Simulated loading delay
+            await new Promise(r => setTimeout(r, 600));
+
             const transactionData = {
                 total_amount: total,
                 payment_method: paymentMethod,
@@ -98,7 +104,7 @@ export default function POSPage() {
             };
 
             const res = await api.post('/transactions', transactionData);
-            
+
             // Set data for Receipt
             setCompletedTransaction({
                 ...transactionData,
@@ -114,6 +120,8 @@ export default function POSPage() {
         } catch (error) {
             console.error('Checkout failed', error);
             alert('Checkout failed');
+        } finally {
+            setIsActionLoading(false);
         }
     };
 
@@ -141,28 +149,36 @@ export default function POSPage() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 content-start">
-                            {filteredProducts.map((product) => (
-                                <div
-                                    key={product.id}
-                                    className={`bg-white p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md flex flex-col justify-between
-                            ${product.stock === 0 ? 'opacity-50 border-red-200 pointer-events-none' : 'border-gray-200'}
-                        `}
-                                    onClick={() => product.stock > 0 && addToCart(product)}
-                                >
-                                    <div>
-                                        <h3 className="font-semibold text-black line-clamp-2">{product.name}</h3>
-                                        <p className="text-xs text-black mt-1">{product.sku}</p>
-                                    </div>
-                                    <div className="mt-4 flex justify-between items-end">
-                                        <span className="font-bold text-blue-600">Rp {product.price.toLocaleString()}</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                            }`}>
-                                            {product.stock} left
-                                        </span>
-                                    </div>
+                        <div className="flex-1 overflow-y-auto grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 content-start relative">
+                            {isActionLoading && (
+                                <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                                 </div>
-                            ))}
+                            )}
+                            {filteredProducts.map((product) => {
+                                const isDisabled = product.stock === 0 || product.category_is_active === 0;
+                                return (
+                                    <div
+                                        key={product.id}
+                                        className={`bg-white p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between
+                            ${isDisabled ? 'opacity-50 grayscale border-gray-200 pointer-events-none' : 'border-gray-200 hover:shadow-md'}
+                        `}
+                                        onClick={() => !isDisabled && addToCart(product)}
+                                    >
+                                        <div>
+                                            <h3 className="font-semibold text-black line-clamp-2">{product.name}</h3>
+                                            <p className="text-xs text-black mt-1">{product.sku}</p>
+                                        </div>
+                                        <div className="mt-4 flex justify-between items-end">
+                                            <span className="font-bold text-blue-600">Rp {product.price.toLocaleString()}</span>
+                                            <span className={`text-xs px-2 py-1 rounded-full ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                {product.stock} left
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
 
@@ -265,16 +281,16 @@ export default function POSPage() {
                                 <span>Subtotal</span>
                                 <span>Rp {subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between text-sm text-black">
+                            {/* <div className="flex justify-between text-sm text-black">
                                 <span>Tax (11%)</span>
                                 <span>Rp {tax.toLocaleString()}</span>
-                            </div>
+                            </div> */}
                             <div className="flex justify-between text-lg font-bold text-black pt-2 border-t border-gray-200">
                                 <span>Total</span>
                                 <span>Rp {total.toLocaleString()}</span>
                             </div>
-                            <Button className="w-full mt-4 h-12 text-lg font-bold" size="lg" onClick={handleCheckout} disabled={cart.length === 0}>
-                                CHECKOUT
+                            <Button className="w-full mt-4 h-12 text-lg font-bold" size="lg" onClick={handleCheckout} disabled={cart.length === 0 || isActionLoading}>
+                                {isActionLoading ? 'PROCESSING...' : 'CHECKOUT'}
                             </Button>
                         </div>
                     </div>
