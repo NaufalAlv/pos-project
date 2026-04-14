@@ -83,9 +83,10 @@ export default function CustomersPage() {
             }
             setIsModalOpen(false);
             fetchCustomers();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save customer', error);
-            alert('Failed to save customer data');
+            const message = error.response?.data?.message || 'Failed to save customer data';
+            alert(message);
         }
     };
 
@@ -279,7 +280,7 @@ export default function CustomersPage() {
                                             placeholder="Enter customer name..."
                                             className="rounded-2xl border-slate-100 font-bold bg-slate-50/30"
                                             value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value.replace(/[^a-zA-Z\s]/g, '') })}
                                             required
                                         />
                                     </div>
@@ -291,7 +292,7 @@ export default function CustomersPage() {
                                                 placeholder="e.g. 08123456789"
                                                 className="rounded-2xl border-slate-100 font-bold bg-slate-50/30 pl-11"
                                                 value={formData.phone}
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^0-9]/g, '') })}
                                             />
                                         </div>
                                     </div>

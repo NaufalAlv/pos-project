@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.4] - 2026-04-14
+### Fixed
+- **Stale Server Routes**: Resolved an issue where saving a new customer would consistently return a `404 Not Found` error. The problem was caused by a stale Node.js process failing to load the newly registered `/api/customers` routes.
+- **Server Process Management**: Performed a full restart of the server on port 5000 to ensure all API endpoints are correctly synchronized and listening for client requests.
+
 ## [1.3.3] - 2026-04-14
 ### Added
 - **Custom Service Billing**: New "Add Service" feature in POS to bill for non-inventory items (Labor, Tips, Towing).

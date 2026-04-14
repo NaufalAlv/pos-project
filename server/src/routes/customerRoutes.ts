@@ -16,7 +16,14 @@ router.post('/', (req: Request, res: Response) => {
     try {
         const { name, phone, plate_number } = req.body;
         if (!name) return res.status(400).json({ message: 'Name is required' });
-        const id = CustomerModel.createCustomer(name, phone, plate_number);
+        
+        // Sanitize: Alphabet + Space for Name, Numeric for Phone
+        const cleanName = name.replace(/[^a-zA-Z\s]/g, '').trim();
+        const cleanPhone = phone ? phone.replace(/[^0-9]/g, '').trim() : null;
+
+        if (!cleanName) return res.status(400).json({ message: 'Invalid name characters removed, name cannot be empty' });
+
+        const id = CustomerModel.createCustomer(cleanName, cleanPhone || undefined, plate_number);
         res.status(201).json({ id, message: 'Customer created successfully' });
     } catch (error: any) {
         res.status(500).json({ message: 'Error creating customer', error: error.message });
@@ -27,7 +34,15 @@ router.put('/:id', (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { name, phone, plate_number } = req.body;
-        CustomerModel.updateCustomer(Number(id), name, phone, plate_number);
+        if (!name) return res.status(400).json({ message: 'Name is required' });
+
+        // Sanitize: Alphabet + Space for Name, Numeric for Phone
+        const cleanName = name.replace(/[^a-zA-Z\s]/g, '').trim();
+        const cleanPhone = phone ? phone.replace(/[^0-9]/g, '').trim() : null;
+
+        if (!cleanName) return res.status(400).json({ message: 'Invalid name characters removed, name cannot be empty' });
+
+        CustomerModel.updateCustomer(Number(id), cleanName, cleanPhone || undefined, plate_number);
         res.json({ message: 'Customer updated successfully' });
     } catch (error: any) {
         res.status(500).json({ message: 'Error updating customer', error: error.message });
