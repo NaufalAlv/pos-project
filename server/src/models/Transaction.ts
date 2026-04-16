@@ -182,3 +182,151 @@ export const getTransactionById = async (id: number): Promise<any> => {
     transaction.items = itemsStmt.all({ id });
     return transaction;
 };
+
+export interface PumpTransaction {
+    external_transaction_id: string;
+    fuel_type: string;
+    litres_dispensed: number;
+    total_cost: number;
+    price_per_litre: number;
+    pump_id?: number;
+}
+
+export const createPumpTransaction = (pumpTx: PumpTransaction): number | bigint => {
+    const executeTransaction = db.transaction((data: PumpTransaction) => {
+        const invoice_number = `PUMP-${Date.now()}`;
+
+        // Insert transaction record with source = 'Pump_Sim', status = PENDING
+        const insertTxStmt = db.prepare(`
+            INSERT INTO transactions (
+                invoice_number, user_id, customer_id, total_amount, 
+                payment_method, cash_handed, cash_change,
+                adjustment_amount, payment_status, reference_id, pump_id
+            ) 
+            VALUES (
+                @invoice_number, @user_id, @customer_id, @total_amount, 
+                @payment_method, @cash_handed, @cash_change,
+                @adjustment_amount, @payment_status, @reference_id, @pump_id
+            )
+        `);
+
+        const txInfo = insertTxStmt.run({
+            invoice_number,
+            user_id: null, // No user for pump transactions until finalized
+            customer_id: null,
+            total_amount: data.total_cost,
+            payment_method: 'cash', // Default, will be updated at checkout
+            cash_handed: 0,
+            cash_change: 0,
+            adjustment_amount: 0,
+            payment_status: 'PENDING',
+            reference_id: data.external_transaction_id,
+            pump_id: data.pump_id || null
+        });
+
+        const transactionId = txInfo.lastInsertRowid;
+
+        // Insert transaction item (fuel — no stock deduction)
+        const insertItemStmt = db.prepare(`
+            INSERT INTO transaction_items (transaction_id, product_id, name, quantity, price, buy_price, subtotal) 
+            VALUES (@transaction_id, @product_id, @name, @quantity, @price, @buy_price, @subtotal)
+        `);
+
+        insertItemStmt.run({
+            transaction_id: transactionId,
+            product_id: null, // Fuel is simulated, not in inventory
+            name: `${data.fuel_type} (Fuel_Sim)`,
+            quantity: Math.round(data.litres_dispensed * 1000) / 1000, // 3 decimal places
+            price: data.price_per_litre,
+            buy_price: 0,
+            subtotal: data.total_cost
+        });
+
+        return transactionId;
+    });
+
+    return executeTransaction(pumpTx);
+};
+
+/**
+ * Get all pending pump transactions for the checkout queue
+ */
+export const getPendingPumpTransactions = (): any[] => {
+    const stmt = db.prepare(`
+        SELECT t.*, c.name as customer_name, c.phone as customer_phone,
+               ti.name as item_name, ti.quantity as litres, ti.price as price_per_litre, ti.subtotal
+        FROM transactions t
+        LEFT JOIN customers c ON t.customer_id = c.id
+        LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
+        WHERE t.payment_status = 'PENDING' 
+          AND t.reference_id LIKE 'PUMP-%'
+          AND (t.is_deleted = 0 OR t.is_deleted IS NULL)
+        ORDER BY t.created_at ASC
+    `);
+    return stmt.all() as any[];
+};
+
+/**
+ * Finalize a pending pump transaction — cashier sets payment method, customer, etc.
+ */
+export interface FinalizePumpPayload {
+    transaction_id: number;
+    payment_method: string;
+    customer_id?: number | null;
+    customer_name?: string;
+    customer_phone?: string;
+    cash_handed?: number;
+    cash_change?: number;
+    user_id?: number;
+}
+
+export const finalizePumpTransaction = (payload: FinalizePumpPayload): void => {
+    const executeFn = db.transaction((data: FinalizePumpPayload) => {
+        let resolvedCustomerId = data.customer_id || null;
+
+        // Resolve customer if name/phone provided but no ID
+        if (!resolvedCustomerId) {
+            const cleanName = data.customer_name?.replace(/[^a-zA-Z\s]/g, '').trim();
+            const cleanPhone = data.customer_phone?.replace(/[^0-9]/g, '').trim();
+
+            if (cleanPhone) {
+                const byPhone = db.prepare('SELECT id FROM customers WHERE phone = ? AND (is_deleted = 0 OR is_deleted IS NULL)').get(cleanPhone) as { id: number } | undefined;
+                if (byPhone) resolvedCustomerId = byPhone.id;
+            }
+            if (!resolvedCustomerId && cleanName && cleanName.length > 0) {
+                const byName = db.prepare('SELECT id FROM customers WHERE name = ? AND (is_deleted = 0 OR is_deleted IS NULL)').get(cleanName) as { id: number } | undefined;
+                if (byName) resolvedCustomerId = byName.id;
+            }
+            if (!resolvedCustomerId && cleanName && cleanName.length > 0) {
+                const newCust = db.prepare('INSERT INTO customers (name, phone) VALUES (?, ?)').run(cleanName, cleanPhone || null);
+                resolvedCustomerId = newCust.lastInsertRowid as number;
+            }
+        }
+
+        const updateStmt = db.prepare(`
+            UPDATE transactions 
+            SET payment_status = 'PAID',
+                payment_method = @payment_method,
+                customer_id = @customer_id,
+                user_id = @user_id,
+                cash_handed = @cash_handed,
+                cash_change = @cash_change
+            WHERE id = @transaction_id AND payment_status = 'PENDING'
+        `);
+
+        const result = updateStmt.run({
+            payment_method: data.payment_method,
+            customer_id: resolvedCustomerId,
+            user_id: data.user_id || null,
+            cash_handed: data.cash_handed || 0,
+            cash_change: data.cash_change || 0,
+            transaction_id: data.transaction_id,
+        });
+
+        if (result.changes === 0) {
+            throw new Error(`Transaction ${data.transaction_id} not found or already finalized`);
+        }
+    });
+
+    executeFn(payload);
+};

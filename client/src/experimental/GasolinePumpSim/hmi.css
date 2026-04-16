@@ -1,0 +1,97 @@
+/* HMI Styles — CSS-isolated for the Gasoline Pump Simulation */
+/* Uses Tailwind utility classes inline; these are supplemental animations */
+
+.hmi-container {
+    /* Isolation boundary */
+    contain: content;
+}
+
+.hmi-panel {
+    background: #020617;
+    box-shadow: 0 0 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* LCD / Segmented font feel */
+.lcd-text {
+    font-family: 'Share Tech Mono', 'Geist Mono', monospace;
+    text-shadow: 0 0 10px currentColor;
+    letter-spacing: 0.1em;
+}
+
+/* Flow animation — moving dashes */
+.flow-dash-animate {
+    animation: flowDash 0.8s linear infinite;
+}
+
+@keyframes flowDash {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+/* Flow arrow pulse */
+.flow-arrow-1 {
+    animation: arrowPulse 0.6s ease-in-out infinite;
+}
+
+@keyframes arrowPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Nozzle drip animation */
+.drip-1 {
+    animation: drip 1.2s ease-in infinite;
+}
+
+.drip-2 {
+    animation: drip 1.2s ease-in infinite 0.4s;
+}
+
+@keyframes drip {
+    0% {
+        opacity: 0.8;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+}
+
+/* Digital display glow effect */
+.digital-display {
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Packet log scrollbar styling */
+.packet-log::-webkit-scrollbar,
+.packet-replay::-webkit-scrollbar {
+    width: 4px;
+}
+
+.packet-log::-webkit-scrollbar-track,
+.packet-replay::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.packet-log::-webkit-scrollbar-thumb,
+.packet-replay::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 2px;
+}
+
+/* Nozzle transition smoothing */
+.nozzle-arm {
+    will-change: transform;
+}
+
+/* Chaos panel warning flash */
+@keyframes warningFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.chaos-active {
+    animation: warningFlash 1s ease-in-out infinite;
+}

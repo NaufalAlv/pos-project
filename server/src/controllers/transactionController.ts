@@ -70,3 +70,69 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         res.status(500).json({ message: error.message || 'Deletion failed', error });
     }
 };
+
+export const createPumpTransaction = async (req: Request, res: Response) => {
+    try {
+        const { 
+            external_transaction_id, 
+            fuel_type, 
+            litres_dispensed, 
+            total_cost, 
+            price_per_litre,
+            pump_id
+        } = req.body;
+
+        const transactionId = TransactionModel.createPumpTransaction({
+            external_transaction_id,
+            fuel_type,
+            litres_dispensed,
+            total_cost,
+            price_per_litre,
+            pump_id
+        });
+
+        res.status(201).json({ 
+            message: 'Pump transaction recorded (PENDING)', 
+            transactionId,
+            source: 'Pump_Sim'
+        });
+    } catch (error: any) {
+        console.error('Pump Transaction Error:', error);
+        res.status(500).json({ message: error.message || 'Pump transaction failed', error });
+    }
+};
+
+export const getPendingPumpTransactions = async (req: Request, res: Response) => {
+    try {
+        const pending = TransactionModel.getPendingPumpTransactions();
+        res.json(pending);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error fetching pending pump transactions', error: error.message });
+    }
+};
+
+export const finalizePumpTransaction = async (req: Request, res: Response) => {
+    try {
+        const user_id = (req as any).user?.id;
+        const { transaction_id, payment_method, customer_id, customer_name, customer_phone, cash_handed, cash_change } = req.body;
+
+        if (!transaction_id || !payment_method) {
+            return res.status(400).json({ message: 'transaction_id and payment_method are required' });
+        }
+
+        TransactionModel.finalizePumpTransaction({
+            transaction_id,
+            payment_method,
+            customer_id,
+            customer_name,
+            customer_phone,
+            cash_handed,
+            cash_change,
+            user_id,
+        });
+
+        res.json({ message: 'Pump transaction finalized', transaction_id });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message || 'Failed to finalize pump transaction', error });
+    }
+};

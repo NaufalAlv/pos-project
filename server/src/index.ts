@@ -25,8 +25,13 @@ console.log('Loading report routes...');
 import reportRoutes from './routes/reportRoutes';
 console.log('Loading customer routes...');
 import customerRoutes from './routes/customerRoutes';
+console.log('Loading feature flag routes...');
+import featureFlagRoutes from './routes/featureFlagRoutes';
+console.log('Loading fuel config routes...');
+import fuelConfigRoutes from './routes/fuelConfigRoutes';
 console.log('All routes loaded.');
 
+// CORS: Allow all origins for general API, but pump-inject is restricted in its middleware
 app.use(cors());
 app.use(express.json());
 
@@ -45,6 +50,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/feature-flags', featureFlagRoutes);
+app.use('/api/fuel-config', fuelConfigRoutes);
 
 app.get('/', (req: Request, res: Response) => {
     res.send('POS-Bengkel API is running');

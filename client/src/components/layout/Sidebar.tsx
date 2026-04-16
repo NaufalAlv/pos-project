@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
-import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X, User } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X, User, FlaskConical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import api from '@/utils/api';
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -15,6 +16,22 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
+    const [sandboxEnabled, setSandboxEnabled] = useState(false);
+
+    useEffect(() => {
+        const checkSandbox = async () => {
+            try {
+                const res = await api.get('/feature-flags/sandbox_enabled');
+                setSandboxEnabled(res.data.enabled === 1);
+            } catch (error) {
+                // Silently fail — feature flags may not exist yet
+            }
+        };
+        checkSandbox();
+        // Re-check every 5 seconds for live toggle response
+        const interval = setInterval(checkSandbox, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -87,6 +104,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 </li>
                             );
                         })}
+
+                        {/* Sandbox Nav — conditionally rendered */}
+                        {sandboxEnabled && (
+                            <li className="pt-2 mt-2 border-t border-border/50">
+                                <Link
+                                    href="/sandbox"
+                                    onClick={onClose}
+                                    className={cn(
+                                        'flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 group relative overflow-hidden',
+                                        pathname === '/sandbox'
+                                            ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-premium'
+                                            : 'text-purple-500 hover:bg-purple-50 hover:text-purple-700'
+                                    )}
+                                >
+                                    <FlaskConical className={cn("mr-3 h-5 w-5 transition-colors", pathname === '/sandbox' ? "text-white" : "text-purple-400 group-hover:text-purple-600")} />
+                                    Sandbox
+                                    {pathname !== '/sandbox' && (
+                                        <span className="absolute right-3 h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    )}
+                                </Link>
+                            </li>
+                        )}
                     </ul>
                 </nav>
 

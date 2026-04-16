@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     customer_id INTEGER,
     total_amount REAL NOT NULL,
     payment_method VARCHAR(20) DEFAULT 'cash' CHECK (payment_method IN ('cash', 'transfer', 'qris', 'debit', 'cc')),
+    cash_handed REAL DEFAULT 0,
+    cash_change REAL DEFAULT 0,
+    adjustment_amount REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'PAID' CHECK (payment_status IN ('PAID', 'PENDING', 'CANCELLED')),
+    reference_id TEXT,
+    pump_id INTEGER,
     is_deleted INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -75,7 +81,8 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     transaction_id INTEGER,
     product_id INTEGER,
-    quantity INTEGER NOT NULL,
+    name TEXT,
+    quantity REAL NOT NULL,
     price REAL NOT NULL,
     buy_price REAL DEFAULT 0,
     subtotal REAL NOT NULL,
@@ -91,4 +98,25 @@ CREATE TABLE IF NOT EXISTS product_restocks (
     buy_price REAL NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- Feature Flags Table (Workshop Labs Infrastructure)
+CREATE TABLE IF NOT EXISTS feature_flags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    enabled INTEGER DEFAULT 0,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Fuel Configuration Table (Workshop Labs - Pump Sim)
+CREATE TABLE IF NOT EXISTS fuel_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fuel_type TEXT NOT NULL UNIQUE,
+    price_per_litre REAL NOT NULL,
+    tank_capacity REAL DEFAULT 10000,
+    refuel_speed REAL DEFAULT 50,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

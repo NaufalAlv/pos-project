@@ -1,0 +1,17 @@
+{
+  "name": "pos-bengkel-ecosystem",
+  "version": "2.0.0",
+  "description": "POS Bengkel Workshop System — Multi-service Ecosystem",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names POS,PUMP,CLIENT --prefix-colors blue,yellow,green \"npm run dev:server\" \"npm run dev:pump\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:pump": "cd pump-controller && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "seed": "cd server && npm run seed",
+    "install:all": "cd server && npm install && cd ../client && npm install && cd ../pump-controller && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
