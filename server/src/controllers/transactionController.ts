@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
-import * as TransactionModel from '../models/Transaction';
+import { transactionService } from '../services/transactionService';
 
 export const createTransaction = async (req: Request, res: Response) => {
     try {
         const user_id = (req as any).user.id; // From Auth Middleware
         const { 
             customer_id, 
+            customer_global_uid,
             customer_name, 
             customer_phone, 
             items, 
@@ -14,16 +15,19 @@ export const createTransaction = async (req: Request, res: Response) => {
             cash_handed,
             cash_change,
             adjustment_amount,
-            payment_status
+            payment_status,
+            reference_id,
+            pump_id,
+            points_redeemed,
+            category
         } = req.body;
 
-        // Simple Invoice Number Generation
         const invoice_number = `INV-${Date.now()}`;
 
-        const transactionId = await TransactionModel.createTransaction({
+        const transactionId = transactionService.createTransaction({
             invoice_number,
             user_id,
-            customer_id,
+            customer_global_uid: customer_global_uid || customer_id, // Support old & new
             customer_name,
             customer_phone,
             total_amount,
@@ -32,7 +36,11 @@ export const createTransaction = async (req: Request, res: Response) => {
             cash_change,
             adjustment_amount,
             payment_status,
-            items
+            items,
+            reference_id,
+            pump_id,
+            points_redeemed,
+            category
         });
 
         res.status(201).json({ message: 'Transaction successful', transactionId, invoice_number });
@@ -43,7 +51,7 @@ export const createTransaction = async (req: Request, res: Response) => {
 
 export const getTransactions = async (req: Request, res: Response) => {
     try {
-        const transactions = await TransactionModel.getAllTransactions();
+        const transactions = transactionService.getAllTransactions();
         res.json(transactions);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching transactions', error });
@@ -53,7 +61,7 @@ export const getTransactions = async (req: Request, res: Response) => {
 export const getTransaction = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const transaction = await TransactionModel.getTransactionById(Number(id));
+        const transaction = transactionService.getTransactionById(id as string);
         if (!transaction) return res.status(404).json({ message: 'Transaction not found' });
         res.json(transaction);
     } catch (error: any) {
@@ -64,7 +72,7 @@ export const getTransaction = async (req: Request, res: Response) => {
 export const deleteTransaction = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        await TransactionModel.softDeleteTransaction(Number(id));
+        transactionService.softDeleteTransaction(id as string);
         res.json({ message: 'Transaction deleted and stock restored' });
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Deletion failed', error });
@@ -79,16 +87,18 @@ export const createPumpTransaction = async (req: Request, res: Response) => {
             litres_dispensed, 
             total_cost, 
             price_per_litre,
-            pump_id
+            pump_id,
+            global_uid
         } = req.body;
 
-        const transactionId = TransactionModel.createPumpTransaction({
+        const transactionId = transactionService.createPumpTransaction({
             external_transaction_id,
             fuel_type,
             litres_dispensed,
             total_cost,
             price_per_litre,
-            pump_id
+            pump_id,
+            global_uid
         });
 
         res.status(201).json({ 
@@ -104,7 +114,7 @@ export const createPumpTransaction = async (req: Request, res: Response) => {
 
 export const getPendingPumpTransactions = async (req: Request, res: Response) => {
     try {
-        const pending = TransactionModel.getPendingPumpTransactions();
+        const pending = transactionService.getPendingPumpTransactions();
         res.json(pending);
     } catch (error: any) {
         res.status(500).json({ message: 'Error fetching pending pump transactions', error: error.message });
@@ -120,7 +130,7 @@ export const finalizePumpTransaction = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'transaction_id and payment_method are required' });
         }
 
-        TransactionModel.finalizePumpTransaction({
+        transactionService.finalizePumpTransaction({
             transaction_id,
             payment_method,
             customer_id,

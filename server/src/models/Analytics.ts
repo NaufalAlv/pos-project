@@ -83,3 +83,97 @@ export const getRecentActivity = async (): Promise<any[]> => {
     `);
     return stmt.all();
 };
+
+export const getMarginAnalytics = async (days: number = 30): Promise<any> => {
+    // Calculate total revenue and total COGS over the last N days
+    const stmt = db.prepare(`
+        SELECT 
+            date(t.created_at, 'localtime') as date,
+            SUM(t.total_amount) as revenue,
+            SUM((
+                SELECT SUM(ti.quantity * ti.buy_price) 
+                FROM transaction_items ti 
+                WHERE ti.transaction_id = t.id
+            )) as cogs
+        FROM transactions t
+        WHERE (t.is_deleted = 0 OR t.is_deleted IS NULL)
+          AND t.created_at >= date('now', '-' || ? || ' days')
+          AND t.payment_status = 'PAID'
+        GROUP BY date(t.created_at, 'localtime')
+        ORDER BY date ASC
+    `);
+    
+    const records = stmt.all(days) as any[];
+    
+    let totalRevenue = 0;
+    let totalCogs = 0;
+    
+    const dailyData = records.map(r => {
+        const margin = r.revenue - (r.cogs || 0);
+        const marginPercentage = r.revenue > 0 ? (margin / r.revenue) * 100 : 0;
+        
+        totalRevenue += r.revenue;
+        totalCogs += (r.cogs || 0);
+        
+        return {
+            date: r.date,
+            revenue: r.revenue,
+            cogs: r.cogs || 0,
+            margin,
+            marginPercentage: Number(marginPercentage.toFixed(2))
+        };
+    });
+    
+    const totalMargin = totalRevenue - totalCogs;
+    const averageMarginPercentage = totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0;
+
+    return {
+        summary: {
+            totalRevenue,
+            totalCogs,
+            totalMargin,
+            averageMarginPercentage: Number(averageMarginPercentage.toFixed(2))
+        },
+        dailyData
+    };
+};
+
+export const getTankProjection = async (): Promise<any> => {
+    // This aggregates fuel dispensation from transactions to project tank depletion
+    // Assuming 'fuel_config' table holds current tank levels, but if not, we use mock projection based on recent usage
+    
+    // Total fuel dispensed last 7 days
+    const usageStmt = db.prepare(`
+        SELECT SUM(ti.quantity) as total_liters
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.id
+        WHERE ti.name LIKE '%Fuel%'
+          AND t.created_at >= date('now', '-7 days')
+          AND (t.is_deleted = 0 OR t.is_deleted IS NULL)
+    `);
+    
+    const result = usageStmt.get() as { total_liters: number | null };
+    const litersLast7Days = result?.total_liters || 0;
+    const dailyBurnRate = litersLast7Days / 7;
+    
+    // Fetch tank status from fuel_config
+    const tankStmt = db.prepare("SELECT * FROM fuel_config WHERE key = 'tank_status'");
+    let tankStatus = { capacity: 10000, currentLevel: 8500 }; // Fallback defaults
+    try {
+        const record = tankStmt.get() as any;
+        if (record && record.value) {
+            tankStatus = JSON.parse(record.value);
+        }
+    } catch(e) {}
+    
+    const daysRemaining = dailyBurnRate > 0 ? tankStatus.currentLevel / dailyBurnRate : 999;
+    
+    return {
+        currentLevel: tankStatus.currentLevel,
+        capacity: tankStatus.capacity,
+        fillPercentage: (tankStatus.currentLevel / tankStatus.capacity) * 100,
+        dailyBurnRate: Number(dailyBurnRate.toFixed(2)),
+        daysRemaining: Number(daysRemaining.toFixed(1)),
+        projectedEmptyDate: new Date(Date.now() + daysRemaining * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    };
+};

@@ -29,6 +29,14 @@ console.log('Loading feature flag routes...');
 import featureFlagRoutes from './routes/featureFlagRoutes';
 console.log('Loading fuel config routes...');
 import fuelConfigRoutes from './routes/fuelConfigRoutes';
+console.log('Loading search routes...');
+import searchRoutes from './routes/searchRoutes';
+console.log('Loading audit routes...');
+import auditRoutes from './routes/auditRoutes';
+console.log('Loading system routes...');
+import systemRoutes from './routes/systemRoutes';
+import transactionCategoryRoutes from './routes/transactionCategoryRoutes';
+import { auditLog } from './services/auditService';
 console.log('All routes loaded.');
 
 // CORS: Allow all origins for general API, but pump-inject is restricted in its middleware
@@ -38,7 +46,44 @@ app.use(express.json());
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     if (req.body && Object.keys(req.body).length > 0) {
-        console.log('Body:', JSON.stringify(req.body, null, 2));
+        // Log Scrubber for Secure Enterprise Core
+        const scrubbedBody = JSON.parse(JSON.stringify(req.body));
+        const sensitiveKeys = ['password', 'phone', 'phone_number', 'tax_id', 'bank_account', 'plate_number', 'metadata', 'old_value_encrypted', 'new_value_encrypted'];
+        
+        const scrub = (obj: any) => {
+            if (!obj || typeof obj !== 'object') return;
+            for (const key in obj) {
+                if (sensitiveKeys.includes(key.toLowerCase())) {
+                    obj[key] = '***REDACTED***';
+                } else if (typeof obj[key] === 'object') {
+                    scrub(obj[key]);
+                }
+            }
+        };
+        
+        scrub(scrubbedBody);
+        console.log('Body:', JSON.stringify(scrubbedBody, null, 2));
+    }
+    next();
+});
+
+// Global Mutation Audit Middleware
+// Logs all authenticated POST/PUT/PATCH/DELETE requests to audit_logs.
+// This runs AFTER route-level auth, so req.user is available.
+app.use((req: any, res: any, next: any) => {
+    const MUTATION_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+    if (MUTATION_METHODS.includes(req.method) && req.user) {
+        // Skip auth endpoint to avoid double-logging (authController already logs LOGIN)
+        if (!req.path.startsWith('/api/auth')) {
+            auditLog({
+                table_name: req.path.split('/')[3] || 'unknown', // e.g. /api/transactions → 'transactions'
+                record_id: req.params?.id || 'bulk',
+                action: `${req.method}:${req.path}`,
+                changed_by: String(req.user?.id || 'unknown'),
+                ip_address: req.ip,
+                reason: `API mutation via ${req.method} ${req.path}`,
+            });
+        }
     }
     next();
 });
@@ -52,7 +97,10 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/feature-flags', featureFlagRoutes);
 app.use('/api/fuel-config', fuelConfigRoutes);
-
+app.use('/api/search', searchRoutes);
+app.use('/api/system', systemRoutes);
+app.use('/api/transaction-categories', transactionCategoryRoutes);
+app.use('/api/audit', auditRoutes);
 app.get('/', (req: Request, res: Response) => {
     res.send('POS-Bengkel API is running');
 });

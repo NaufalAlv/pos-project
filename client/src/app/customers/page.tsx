@@ -16,16 +16,19 @@ import {
     Car,
     UserPlus,
     X,
-    Filter
+    Filter,
+    Activity
 } from 'lucide-react';
 import api from '@/utils/api';
-import { cn } from '@/utils/cn';
+import MaskedField from '@/components/ui/MaskedField';
+import Link from 'next/link';
 
 interface Customer {
-    id: number;
+    id: string; // Now mapping to global_uid
     name: string;
     phone: string | null;
     plate_number: string | null;
+    loyalty_points: number;
     created_at: string;
 }
 
@@ -69,6 +72,7 @@ export default function CustomersPage() {
         } else {
             setEditingCustomer(null);
             setFormData({ name: '', phone: '', plate_number: '' });
+
         }
         setIsModalOpen(true);
     };
@@ -90,7 +94,7 @@ export default function CustomersPage() {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this customer? This will preserve transaction history for audit but hide the customer from active lists.')) return;
         try {
             await api.delete(`/customers/${id}`);
@@ -200,7 +204,7 @@ export default function CustomersPage() {
                                                         </div>
                                                         <div>
                                                             <p className="font-black text-neutral uppercase text-sm">{customer.name.trim() || 'Anonymous'}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400 italic">ID: #{customer.id.toString().padStart(4, '0')}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400 italic">ID: #{customer.id?.toString().padStart(4, '0') ?? 'N/A'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -208,7 +212,11 @@ export default function CustomersPage() {
                                                     {customer.phone ? (
                                                         <span className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-[11px] font-black">
                                                             <Phone size={12} />
-                                                            {customer.phone}
+                                                            <MaskedField 
+                                                                fieldName="phone" 
+                                                                maskedValue="***-****-****" 
+                                                                customerUid={customer.id} 
+                                                            />
                                                         </span>
                                                     ) : (
                                                         <span className="text-slate-300 text-[10px] font-bold italic">No Phone</span>
@@ -231,6 +239,13 @@ export default function CustomersPage() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-2">
+                                                        <Link
+                                                            href={`/crm/${customer.id}`}
+                                                            className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                                                            title="View 360 CRM Timeline"
+                                                        >
+                                                            <Activity size={16} />
+                                                        </Link>
                                                         <button
                                                             onClick={() => handleOpenModal(customer)}
                                                             className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"

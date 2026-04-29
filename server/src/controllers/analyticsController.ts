@@ -38,3 +38,22 @@ export const getInventoryStats = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Error fetching inventory stats', error });
     }
 };
+
+export const getMargin = async (req: Request, res: Response) => {
+    try {
+        const days = req.query.days ? parseInt(req.query.days as string) : 30;
+        const data = await AnalyticsModel.getMarginAnalytics(days);
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching margin analytics', error });
+    }
+};
+
+export const getTankProjectionData = async (req: Request, res: Response) => {
+    try {
+        const data = await AnalyticsModel.getTankProjection();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching tank projection', error });
+    }
+};

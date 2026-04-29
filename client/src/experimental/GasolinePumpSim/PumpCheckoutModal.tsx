@@ -28,7 +28,8 @@ const PAYMENT_METHODS = [
 
 export default function PumpCheckoutModal({ pump, pendingTxId, onClose, onFinalized }: PumpCheckoutModalProps) {
     const [customers, setCustomers] = useState<Customer[]>([]);
-    const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+    //    const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -122,9 +123,8 @@ export default function PumpCheckoutModal({ pump, pendingTxId, onClose, onFinali
                                 <button
                                     key={m}
                                     onClick={() => setMode(m)}
-                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors ${
-                                        mode === m ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'
-                                    }`}
+                                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors ${mode === m ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent'
+                                        }`}
                                 >
                                     {m === 'guest' ? 'Guest' : m === 'select' ? 'Existing' : 'New'}
                                 </button>
@@ -134,13 +134,20 @@ export default function PumpCheckoutModal({ pump, pendingTxId, onClose, onFinali
 
                     {mode === 'select' && (
                         <select
-                            value={selectedCustomerId || ''}
-                            onChange={e => setSelectedCustomerId(Number(e.target.value) || null)}
+                            // ✅ Use ?? so it works whether the state is null, undefined, or a string
+                            value={selectedCustomerId ?? ''}
+                            onChange={e => {
+                                const val = e.target.value;
+                                // ✅ Keep the value as string (or null). Never mix numbers here.
+                                setSelectedCustomerId(val === '' ? null : val);
+                            }}
                             className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/40"
                         >
                             <option value="">{'\u2014'} Select Customer {'\u2014'}</option>
                             {customers.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>
+                                <option key={c.id} value={String(c.id)}>
+                                    {c.name} {c.phone ? `(${c.phone})` : ''}
+                                </option>
                             ))}
                         </select>
                     )}
@@ -177,11 +184,10 @@ export default function PumpCheckoutModal({ pump, pendingTxId, onClose, onFinali
                             <button
                                 key={pm.value}
                                 onClick={() => setPaymentMethod(pm.value)}
-                                className={`py-2 rounded-lg text-[10px] font-bold transition-all ${
-                                    paymentMethod === pm.value
-                                        ? `${pm.color} text-white ring-2 ring-purple-500/20 shadow-md scale-105`
-                                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 hover:border-slate-300'
-                                }`}
+                                className={`py-2 rounded-lg text-[10px] font-bold transition-all ${paymentMethod === pm.value
+                                    ? `${pm.color} text-white ring-2 ring-purple-500/20 shadow-md scale-105`
+                                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 hover:border-slate-300'
+                                    }`}
                             >
                                 {pm.label}
                             </button>

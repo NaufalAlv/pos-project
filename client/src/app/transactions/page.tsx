@@ -4,13 +4,13 @@ import React, { useEffect, useState, useMemo } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import api from '@/utils/api';
-import { 
-    Search, 
-    Filter, 
-    Calendar as CalendarIcon, 
-    Eye, 
-    Trash2, 
-    ChevronLeft, 
+import {
+    Search,
+    Filter,
+    Calendar as CalendarIcon,
+    Eye,
+    Trash2,
+    ChevronLeft,
     ChevronRight,
     ClipboardList,
     Clock,
@@ -38,6 +38,7 @@ interface Transaction {
     cash_change?: number;
     adjustment_amount?: number;
     payment_status?: string;
+    category?: string;
 }
 
 export default function TransactionsPage() {
@@ -45,7 +46,7 @@ export default function TransactionsPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [dateFilter, setDateFilter] = useState('');
-    
+
     // Receipt Preview
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
     const [isReceiptLoading, setIsReceiptLoading] = useState(false);
@@ -97,12 +98,13 @@ export default function TransactionsPage() {
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
-            const matchesSearch = 
+            const matchesSearch =
                 tx.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-                (tx.customer_name && tx.customer_name.toLowerCase().includes(search.toLowerCase()));
-            
+                (tx.customer_name && tx.customer_name.toLowerCase().includes(search.toLowerCase())) ||
+                (tx.category && tx.category.toLowerCase().includes(search.toLowerCase()));
+
             const matchesDate = !dateFilter || tx.created_at.startsWith(dateFilter);
-            
+
             return matchesSearch && matchesDate;
         });
     }, [transactions, search, dateFilter]);
@@ -111,7 +113,7 @@ export default function TransactionsPage() {
         <ProtectedRoute>
             <DashboardLayout>
                 <div className="space-y-6 animate-in">
-                    
+
                     {/* Page Header */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
@@ -119,7 +121,7 @@ export default function TransactionsPage() {
                             <p className="text-slate-500 mt-1">Review finalized sales and reprint receipts.</p>
                         </div>
                         <div className="flex items-center gap-2">
-                             <Button variant="outline" size="sm" onClick={fetchTransactions} disabled={loading}>
+                            <Button variant="outline" size="sm" onClick={fetchTransactions} disabled={loading}>
                                 <Clock className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
                                 Refresh
                             </Button>
@@ -131,18 +133,18 @@ export default function TransactionsPage() {
                         <CardContent className="p-4 md:p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="space-y-1.5 flex flex-col">
-                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Search size={14}/> Search</label>
-                                    <Input 
-                                        placeholder="Invoice # or Customer name..." 
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Search size={14} /> Search</label>
+                                    <Input
+                                        placeholder="Invoice # or Customer name..."
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="bg-slate-50"
                                     />
                                 </div>
                                 <div className="space-y-1.5 flex flex-col">
-                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><CalendarIcon size={14}/> Date Filter</label>
-                                    <Input 
-                                        type="date" 
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><CalendarIcon size={14} /> Date Filter</label>
+                                    <Input
+                                        type="date"
                                         value={dateFilter}
                                         onChange={(e) => setDateFilter(e.target.value)}
                                         className="bg-slate-50"
@@ -167,6 +169,7 @@ export default function TransactionsPage() {
                                         <th className="px-6 py-4">Date & Time</th>
                                         <th className="px-6 py-4">Customer</th>
                                         <th className="px-6 py-4">Staff</th>
+                                        <th className="px-6 py-4">Category</th>
                                         <th className="px-6 py-4 text-center">Items</th>
                                         <th className="px-6 py-4 text-center">Status</th>
                                         <th className="px-6 py-4 text-right">Amount</th>
@@ -201,13 +204,18 @@ export default function TransactionsPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 italic text-slate-600">{tx.username}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                        {tx.category || 'General'}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4 text-center font-bold">{tx.total_items}</td>
                                                 <td className="px-6 py-4 text-center">
                                                     <span className={cn(
                                                         "text-[9px] font-black px-2 py-0.5 rounded-full border",
-                                                        tx.payment_status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                        tx.payment_status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-100' : 
-                                                        'bg-amber-50 text-amber-600 border-amber-100'
+                                                        tx.payment_status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                            tx.payment_status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                                'bg-amber-50 text-amber-600 border-amber-100'
                                                     )}>
                                                         {tx.payment_status || 'PAID'}
                                                     </span>
@@ -227,17 +235,17 @@ export default function TransactionsPage() {
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
                                                             className="h-8 w-8 p-0 text-neutral hover:text-primary transition-colors"
                                                             onClick={() => handleViewReceipt(tx.id)}
                                                         >
                                                             <Eye size={16} />
                                                         </Button>
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
                                                             className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                                             onClick={() => setVoidingId(tx.id)}
                                                         >
@@ -256,9 +264,9 @@ export default function TransactionsPage() {
 
                 {/* Receipt Preview Modal */}
                 {selectedTx && (
-                    <Receipt 
-                        transaction={selectedTx} 
-                        onClose={() => setSelectedTx(null)} 
+                    <Receipt
+                        transaction={selectedTx}
+                        onClose={() => setSelectedTx(null)}
                     />
                 )}
 

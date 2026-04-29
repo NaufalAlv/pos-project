@@ -6,12 +6,12 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import api from '@/utils/api';
 import { useRouter } from 'next/navigation';
-import { 
-    TrendingUp, 
-    ShoppingCart, 
-    AlertTriangle, 
-    DollarSign, 
-    Clock, 
+import {
+    TrendingUp,
+    ShoppingCart,
+    AlertTriangle,
+    DollarSign,
+    Clock,
     ArrowRight,
     Users,
     Hammer,
@@ -30,7 +30,7 @@ export default function DashboardPage() {
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
     const [health, setHealth] = useState({ status: 'offline', database: 'unknown', network: 'unknown' });
     const [selectedTx, setSelectedTx] = useState<any | null>(null);
-    
+
     const router = useRouter();
 
     useEffect(() => {
@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
         fetchData();
         fetchHealth();
-        
+
         const healthInterval = setInterval(fetchHealth, 10000);
         return () => clearInterval(healthInterval);
     }, []);
@@ -264,9 +264,9 @@ export default function DashboardPage() {
 
                 {/* Receipt Preview Modal */}
                 {selectedTx && (
-                    <Receipt 
-                        transaction={selectedTx} 
-                        onClose={() => setSelectedTx(null)} 
+                    <Receipt
+                        transaction={selectedTx}
+                        onClose={() => setSelectedTx(null)}
                     />
                 )}
             </DashboardLayout>

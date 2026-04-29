@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
-import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X, User, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, FileText, Settings, LogOut, X, User, FlaskConical, Fuel } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import api from '@/utils/api';
 
@@ -107,24 +107,41 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                         {/* Sandbox Nav — conditionally rendered */}
                         {sandboxEnabled && (
-                            <li className="pt-2 mt-2 border-t border-border/50">
-                                <Link
-                                    href="/sandbox"
-                                    onClick={onClose}
-                                    className={cn(
-                                        'flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 group relative overflow-hidden',
-                                        pathname === '/sandbox'
-                                            ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-premium'
-                                            : 'text-purple-500 hover:bg-purple-50 hover:text-purple-700'
-                                    )}
-                                >
-                                    <FlaskConical className={cn("mr-3 h-5 w-5 transition-colors", pathname === '/sandbox' ? "text-white" : "text-purple-400 group-hover:text-purple-600")} />
-                                    Sandbox
-                                    {pathname !== '/sandbox' && (
-                                        <span className="absolute right-3 h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    )}
-                                </Link>
-                            </li>
+                            <>
+                                <li className="pt-2 mt-2 border-t border-border/50">
+                                    <Link
+                                        href="/sandbox"
+                                        onClick={onClose}
+                                        className={cn(
+                                            'flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 group relative overflow-hidden',
+                                            pathname === '/sandbox'
+                                                ? 'bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-premium'
+                                                : 'text-purple-500 hover:bg-purple-50 hover:text-purple-700'
+                                        )}
+                                    >
+                                        <FlaskConical className={cn("mr-3 h-5 w-5 transition-colors", pathname === '/sandbox' ? "text-white" : "text-purple-400 group-hover:text-purple-600")} />
+                                        Sandbox
+                                        {pathname !== '/sandbox' && (
+                                            <span className="absolute right-3 h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                                        )}
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link
+                                        href="/pump-controller"
+                                        onClick={onClose}
+                                        className={cn(
+                                            'flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 group relative overflow-hidden',
+                                            pathname === '/pump-controller'
+                                                ? 'bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-premium'
+                                                : 'text-amber-600 hover:bg-amber-50 hover:text-amber-700'
+                                        )}
+                                    >
+                                        <Fuel className={cn("mr-3 h-5 w-5 transition-colors", pathname === '/pump-controller' ? "text-white" : "text-amber-400 group-hover:text-amber-600")} />
+                                        Pump Config
+                                    </Link>
+                                </li>
+                            </>
                         )}
                     </ul>
                 </nav>

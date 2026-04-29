@@ -8,6 +8,7 @@ export const getCustomReport = async (req: Request, res: Response) => {
             endDate: req.query.endDate as string,
             paymentMethod: req.query.paymentMethod as string,
             categoryId: req.query.categoryId as string,
+            transactionCategory: req.query.transactionCategory as string,
         };
 
         const reportData = await ReportModel.getCustomReport(filters);

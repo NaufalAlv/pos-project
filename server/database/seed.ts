@@ -2,14 +2,106 @@ import { db } from '../src/config/db';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
-const seed = async () => {
-    try {
-        // Run Schema
+const migrateToUUID = () => {
+    // Check if customers table exists and has id as INTEGER
+    const custTableInfo = db.prepare("PRAGMA table_info(customers)").all() as any[];
+    const hasGlobalUid = custTableInfo.some((col: any) => col.name === 'global_uid');
+    
+    if (custTableInfo.length > 0 && !hasGlobalUid) {
+        console.log('UUID Migration: Upgrading schema to use UUIDs...');
+        
+        // 1. Rename existing tables
+        db.exec('ALTER TABLE customers RENAME TO customers_old');
+        db.exec('ALTER TABLE transactions RENAME TO transactions_old');
+        db.exec('ALTER TABLE transaction_items RENAME TO transaction_items_old');
+        
+        // 2. Re-run schema to create new tables
+        const schemaPath = path.resolve(__dirname, 'schema.sql');
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        db.exec(schema);
+        
+        // 3. Migrate Customers
+        const oldCustomers = db.prepare('SELECT * FROM customers_old').all() as any[];
+        const customerMap = new Map<number, string>(); // oldId -> newUUID
+        
+        const insertCust = db.prepare(`
+            INSERT INTO customers (global_uid, name, phone, plate_number, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        
+        for (const cust of oldCustomers) {
+            const newUid = crypto.randomUUID();
+            customerMap.set(cust.id, newUid);
+            insertCust.run(newUid, cust.name, cust.phone, cust.plate_number, cust.created_at);
+        }
+        
+        // 4. Migrate Transactions
+        const oldTransactions = db.prepare('SELECT * FROM transactions_old').all() as any[];
+        const transactionMap = new Map<number, string>(); // oldTxId -> newTxUUID
+        
+        const insertTx = db.prepare(`
+            INSERT INTO transactions (
+                id, invoice_number, user_id, customer_id, total_amount, 
+                payment_method, cash_handed, cash_change, adjustment_amount, 
+                payment_status, reference_id, pump_id, is_deleted, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const tx of oldTransactions) {
+            const newTxUid = crypto.randomUUID();
+            transactionMap.set(tx.id, newTxUid);
+            
+            let newCustId = null;
+            if (tx.customer_id) {
+                newCustId = customerMap.get(tx.customer_id) || null;
+            }
+            
+            insertTx.run(
+                newTxUid, tx.invoice_number, tx.user_id, newCustId, tx.total_amount,
+                tx.payment_method, tx.cash_handed || 0, tx.cash_change || 0, tx.adjustment_amount || 0,
+                tx.payment_status || 'PAID', tx.reference_id, tx.pump_id, tx.is_deleted || 0, tx.created_at
+            );
+        }
+        
+        // 5. Migrate Transaction Items
+        const oldItems = db.prepare('SELECT * FROM transaction_items_old').all() as any[];
+        const insertItem = db.prepare(`
+            INSERT INTO transaction_items (
+                transaction_id, product_id, name, quantity, price, buy_price, subtotal
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const item of oldItems) {
+            const newTxId = transactionMap.get(item.transaction_id);
+            if (newTxId) {
+                insertItem.run(
+                    newTxId, item.product_id, item.name, item.quantity, 
+                    item.price, item.buy_price || 0, item.subtotal
+                );
+            }
+        }
+        
+        // 6. Drop old tables
+        db.exec('DROP TABLE transaction_items_old');
+        db.exec('DROP TABLE transactions_old');
+        db.exec('DROP TABLE customers_old');
+        
+        console.log('UUID Migration Complete.');
+    } else {
+        // Just run schema
         const schemaPath = path.resolve(__dirname, 'schema.sql');
         const schema = fs.readFileSync(schemaPath, 'utf8');
         db.exec(schema);
         console.log('Schema initialized.');
+    }
+};
+
+const seed = async () => {
+    try {
+        // Run Migration and Schema
+        migrateToUUID();
 
         // Check if users exist
         const checkUserStmt = db.prepare('SELECT * FROM users LIMIT 1');
@@ -67,7 +159,6 @@ const seed = async () => {
         }
 
         // Seed Fuel Config (Workshop Labs - Pump Sim)
-        // Migration: add tank_capacity and refuel_speed if missing
         const fuelTableInfo = db.prepare("PRAGMA table_info(fuel_config)").all() as any[];
         const hasTankCapacity = fuelTableInfo.some((col: any) => col.name === 'tank_capacity');
         if (!hasTankCapacity) {
@@ -87,13 +178,48 @@ const seed = async () => {
             console.log('Default fuel config created.');
         }
 
-        // Migration: add pump_id to transactions if missing
+        // Migrate users: add is_active column if not present
+        const userTableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+        const hasIsActive = userTableInfo.some((col: any) => col.name === 'is_active');
+        if (!hasIsActive) {
+            console.log('Migrating users: adding is_active column...');
+            db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+            console.log('Migration complete: users.is_active added.');
+        }
+
+        // Migrate transactions: add category column if not present
         const txTableInfo = db.prepare("PRAGMA table_info(transactions)").all() as any[];
-        const hasPumpId = txTableInfo.some((col: any) => col.name === 'pump_id');
-        if (!hasPumpId) {
-            console.log('Migrating transactions: adding pump_id...');
-            db.exec('ALTER TABLE transactions ADD COLUMN pump_id INTEGER');
-            console.log('Migration complete.');
+        const hasCategory = txTableInfo.some((col: any) => col.name === 'category');
+        if (!hasCategory) {
+            console.log('Migrating transactions: adding category column...');
+            db.exec('ALTER TABLE transactions ADD COLUMN category VARCHAR(50)');
+            console.log('Migration complete: transactions.category added.');
+        }
+
+        // Seed Transaction Categories
+        const checkTxCatStmt = db.prepare('SELECT * FROM transaction_categories LIMIT 1');
+        if (!checkTxCatStmt.get()) {
+            console.log('No transaction categories found. Creating defaults...');
+            const insertTxCat = db.prepare('INSERT INTO transaction_categories (name, is_default) VALUES (?, ?)');
+            insertTxCat.run('General', 1);
+            insertTxCat.run('Service', 0);
+            insertTxCat.run('Parts', 0);
+            insertTxCat.run('Fuel Station', 0);
+            insertTxCat.run('Towing', 0);
+            console.log('Default transaction categories created.');
+        }
+
+        // Update existing fuel transactions to use "Fuel Station" category
+        db.prepare("UPDATE transactions SET category = 'Fuel Station' WHERE pump_id IS NOT NULL AND category IS NULL").run();
+
+        // Run FTS5 Rebuild to populate virtual tables with existing data
+        console.log('Rebuilding FTS5 Search Indices...');
+        try {
+            db.exec("INSERT INTO customers_fts(customers_fts) VALUES('rebuild');");
+            db.exec("INSERT INTO products_fts(products_fts) VALUES('rebuild');");
+            console.log('FTS5 Search Indices Rebuilt.');
+        } catch (ftsErr) {
+            console.error('FTS Rebuild error (might be first run):', ftsErr);
         }
 
         process.exit(0);

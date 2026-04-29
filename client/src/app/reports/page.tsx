@@ -13,6 +13,7 @@ import { cn } from '@/utils/cn';
 export default function ReportsPage() {
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<any[]>([]);
+    const [txCategories, setTxCategories] = useState<any[]>([]);
     
     // Filters
     const [datePreset, setDatePreset] = useState('today');
@@ -20,7 +21,8 @@ export default function ReportsPage() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'all',
-        categoryId: 'all'
+        categoryId: 'all',
+        transactionCategory: 'all'
     });
 
     // Report Results
@@ -76,7 +78,16 @@ export default function ReportsPage() {
                 console.error('Failed to fetch categories', error);
             }
         };
+        const fetchTxCategories = async () => {
+            try {
+                const res = await api.get('/transaction-categories');
+                setTxCategories(res.data);
+            } catch (error) {
+                console.error('Failed to fetch tx categories', error);
+            }
+        };
         fetchCategories();
+        fetchTxCategories();
     }, []);
 
     const handleDatePresetChange = (preset: string) => {
@@ -117,6 +128,7 @@ export default function ReportsPage() {
             if (filters.endDate) params.append('endDate', filters.endDate);
             if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod);
             if (filters.categoryId) params.append('categoryId', filters.categoryId);
+            if (filters.transactionCategory) params.append('transactionCategory', filters.transactionCategory);
 
             const res = await api.get(`/reports/custom?${params.toString()}`);
             setReportData(res.data);
@@ -201,7 +213,7 @@ export default function ReportsPage() {
                                     </select>
                                 </div>
 
-                                {/* Category Filter */}
+                                {/* Product Category Filter */}
                                 <div className="space-y-1.5 flex flex-col">
                                     <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Tag size={14}/> Product Category</label>
                                     <select 
@@ -212,6 +224,21 @@ export default function ReportsPage() {
                                         <option value="all">All Categories</option>
                                         {categories.map(c => (
                                             <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Transaction Category Filter */}
+                                <div className="space-y-1.5 flex flex-col">
+                                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><FileText size={14}/> Tx Category</label>
+                                    <select 
+                                        className="w-full px-3 py-2 rounded-xl border border-border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all outline-none text-sm text-neutral"
+                                        value={filters.transactionCategory}
+                                        onChange={(e) => setFilters({...filters, transactionCategory: e.target.value})}
+                                    >
+                                        <option value="all">All Types</option>
+                                        {txCategories.map(c => (
+                                            <option key={c.id} value={c.name}>{c.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -288,7 +315,10 @@ export default function ReportsPage() {
                                                     <td className="px-4 py-2 font-semibold">
                                                         <div className="flex flex-col">
                                                             <span>{row.item_name}</span>
-                                                            <span className="text-[8px] text-slate-400 uppercase">{row.category_name || '-'}</span>
+                                                            <div className="flex gap-1">
+                                                                <span className="text-[8px] text-slate-400 uppercase">{row.category_name || '-'}</span>
+                                                                <span className="text-[8px] text-indigo-400 font-bold uppercase">{row.transaction_category || '-'}</span>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2 uppercase font-black text-[9px]">{row.payment_method}</td>
@@ -392,5 +422,5 @@ export default function ReportsPage() {
             </DashboardLayout>
         </ProtectedRoute>
     );
-};
+}
 

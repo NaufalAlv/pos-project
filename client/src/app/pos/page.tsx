@@ -49,7 +49,8 @@ export default function POSPage() {
     // Checkout State
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
-    const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<number | string | null>(null);
+    const [customerPoints, setCustomerPoints] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'debit' | 'qris' | 'transfer'>('cash');
     const [cashHanded, setCashHanded] = useState<string>('');
     const [completedTransaction, setCompletedTransaction] = useState<any>(null);
@@ -67,10 +68,25 @@ export default function POSPage() {
     // Review & Adjustment State
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [adjustment, setAdjustment] = useState<number>(0);
+    const [usePoints, setUsePoints] = useState(false);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState('General');
 
     useEffect(() => {
         fetchProducts();
+        fetchCategories();
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await api.get('/transaction-categories');
+            setCategories(res.data);
+            const defaultCat = res.data.find((c: any) => c.is_default);
+            if (defaultCat) setSelectedCategory(defaultCat.name);
+        } catch (error) {
+            console.error('Failed to fetch categories', error);
+        }
+    };
 
     // Live search for customer by phone
     useEffect(() => {
@@ -103,6 +119,7 @@ export default function POSPage() {
         setCustomerName(customer.name);
         setCustomerPhone(customer.phone);
         setSelectedCustomerId(customer.id);
+        setCustomerPoints(customer.loyalty_points || 0);
         setShowSuggestions(false);
         setCustomerSuggestions([]);
     };
@@ -165,7 +182,8 @@ export default function POSPage() {
     };
 
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    const grandTotal = subtotal + adjustment;
+    const pointsDiscount = usePoints ? (customerPoints * 100) : 0; // 1 point = 100 IDR discount
+    const grandTotal = Math.max(0, subtotal + adjustment - pointsDiscount);
     const changeAmount = Number(cashHanded) > 0 ? Number(cashHanded) - grandTotal : 0;
 
     const handleAdjustmentChange = (value: string) => {
@@ -203,6 +221,8 @@ export default function POSPage() {
                     quantity: item.quantity,
                     price: item.price,
                 })),
+                points_redeemed: usePoints ? customerPoints : 0,
+                category: selectedCategory,
             };
 
             const res = await api.post('/transactions', transactionData);
@@ -217,6 +237,8 @@ export default function POSPage() {
             setCustomerName('');
             setCustomerPhone('');
             setSelectedCustomerId(null);
+            setCustomerPoints(0);
+            setUsePoints(false);
             setCashHanded('');
             setAdjustment(0);
             setIsReviewModalOpen(false);
@@ -325,8 +347,11 @@ export default function POSPage() {
                                                 className="p-3 hover:bg-slate-50 cursor-pointer border-b last:border-0 border-border/20 transition-colors"
                                                 onMouseDown={() => selectCustomer(cust)}
                                             >
-                                                <p className="font-black text-xs text-neutral">{cust.name}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold tracking-wider">{cust.phone}</p>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="font-black text-xs text-neutral">{cust.name}</p>
+                                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">{cust.loyalty_points || 0} pts</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 font-bold tracking-wider">{cust.phone || cust.plate_number}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -541,10 +566,49 @@ export default function POSPage() {
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-black text-sm uppercase italic truncate">{customerName || 'Walk-in customer'}</p>
                                                 <p className="text-[10px] font-bold opacity-50 truncate">{customerPhone || 'NO PHONE'}</p>
-                                                <p className="text-[9px] font-black text-primary uppercase">{paymentMethod} PAYMENT</p>
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <p className="text-[9px] font-black text-primary uppercase">{paymentMethod} PAYMENT</p>
+                                                    {customerPoints > 0 && (
+                                                        <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-100/50 px-1.5 py-0.5 rounded">
+                                                            {customerPoints} PTS AVAIL
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {/* Transaction Category Selector */}
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TRANSACTION CATEGORY</p>
+                                        <select 
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:border-primary transition-all appearance-none cursor-pointer"
+                                            value={selectedCategory}
+                                            onChange={(e) => setSelectedCategory(e.target.value)}
+                                        >
+                                            {categories.map(cat => (
+                                                <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Loyalty Redemption */}
+                                    {customerPoints > 0 && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between p-3 border border-amber-200 bg-amber-50 rounded-2xl cursor-pointer hover:bg-amber-100/50 transition-colors" onClick={() => setUsePoints(!usePoints)}>
+                                                <div className="flex items-center gap-2">
+                                                    <input type="checkbox" checked={usePoints} onChange={() => setUsePoints(!usePoints)} className="rounded text-amber-500 focus:ring-amber-500/20" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-amber-800">Redeem Loyalty Points</p>
+                                                        <p className="text-[10px] text-amber-600/70">Use {customerPoints} pts for a discount</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xs font-black text-amber-600">-Rp {(customerPoints * 100).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Manual Adjustment Section */}
                                     <div className="space-y-3">
@@ -575,6 +639,12 @@ export default function POSPage() {
                                             <span>MANUAL CORRECTION</span>
                                             <span>{adjustment > 0 ? '+' : ''} Rp {adjustment.toLocaleString()}</span>
                                         </div>
+                                        {usePoints && (
+                                            <div className="flex justify-between text-xs font-black text-amber-500 italic">
+                                                <span>LOYALTY REDEMPTION</span>
+                                                <span>- Rp {pointsDiscount.toLocaleString()}</span>
+                                            </div>
+                                        )}
                                         
                                         <div className="pt-4 mt-6 border-t border-slate-200 space-y-4">
                                             <div className="flex flex-col items-center justify-center p-6 bg-neutral text-white rounded-4xl shadow-2xl relative overflow-hidden group">

@@ -11,7 +11,7 @@ import axios from 'axios';
 import { PumpStateMachine } from './pumpStateMachine';
 import { TelemetryEmitter } from './telemetryEmitter';
 import { TransactionBridge } from './transactionBridge';
-import { BufferManager } from './bufferManager';
+import { bufferManager } from './bufferManager';
 import { ChaosEngine } from './chaosEngine';
 import { StorageTankManager, TankConfig } from './storageTankManager';
 
@@ -36,13 +36,12 @@ for (let i = 1; i <= NUM_PUMPS; i++) {
     pumps.set(i, new PumpStateMachine(i));
 }
 
-const buffer = new BufferManager();
 const tankManager = new StorageTankManager();
 tankManager.setSocket(io);
 
 const pumpArray = Array.from(pumps.values());
 const telemetry = new TelemetryEmitter(io, pumpArray, tankManager);
-const bridge = new TransactionBridge(posApiUrl, pumpSecret, buffer);
+const bridge = new TransactionBridge(posApiUrl, pumpSecret);
 const chaos = new ChaosEngine(pumps, telemetry, tankManager);
 
 // Start the telemetry broadcast loop
@@ -120,7 +119,7 @@ function getPump(req: express.Request, res: express.Response): PumpStateMachine 
 /**
  * GET /api/pumps — list all pump statuses
  */
-app.get('/api/pumps', (req, res) => {
+app.get('/api/pumps', async (req, res) => {
     const statuses = Array.from(pumps.entries()).map(([id, pump]) => {
         const session = pump.getSession();
         return {
@@ -128,7 +127,8 @@ app.get('/api/pumps', (req, res) => {
             chaos: chaos.getActiveFault(id),
         };
     });
-    res.json({ pumps: statuses, tanks: tankManager.getTankStatus(), buffer_size: buffer.getBuffer().length });
+    const buf = await bufferManager.load();
+    res.json({ pumps: statuses, tanks: tankManager.getTankStatus(), buffer_size: buf.pending.length });
 });
 
 /**

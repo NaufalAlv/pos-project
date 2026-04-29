@@ -5,6 +5,7 @@ export interface ReportFilter {
     endDate?: string;
     paymentMethod?: string;
     categoryId?: string;
+    transactionCategory?: string;
 }
 
 export const getCustomReport = async (filters: ReportFilter) => {
@@ -30,6 +31,11 @@ export const getCustomReport = async (filters: ReportFilter) => {
     if (filters.categoryId && filters.categoryId !== 'all') {
         whereClauses.push('p.category_id = @categoryId');
         params.categoryId = filters.categoryId;
+    }
+    
+    if (filters.transactionCategory && filters.transactionCategory !== 'all') {
+        whereClauses.push('t.category = @transactionCategory');
+        params.transactionCategory = filters.transactionCategory;
     }
 
     const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -67,6 +73,7 @@ export const getCustomReport = async (filters: ReportFilter) => {
             ti.quantity,
             ti.price as sell_price,
             ti.buy_price,
+            t.category as transaction_category,
             (ti.price - ti.buy_price) * ti.quantity as margin
         FROM transaction_items ti
         JOIN transactions t ON ti.transaction_id = t.id

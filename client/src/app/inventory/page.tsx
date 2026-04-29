@@ -20,6 +20,9 @@ interface Product {
     price: number;
     buy_price?: number;
     category_name?: string;
+    category_id?: string | number;
+    unit_of_measure?: string;
+    metadata?: string | object;
 }
 
 export default function InventoryPage() {
@@ -68,14 +71,43 @@ export default function InventoryPage() {
 
     // Form State
     const [formData, setFormData] = useState({
-        name: '',
+        base_name: '',
         description: '',
         sku: '',
         stock: 0,
         price: 0,
         buy_price: 0,
-        category_id: ''
+        category_id: '',
+        brand_name: '',
+        unit_of_measure: 'pcs',
+        metadata: {} as Record<string, string>
     });
+
+    const CATEGORY_TEMPLATES: Record<string, { attributes: { key: string, label: string, placeholder: string }[], generateName: (brand: string, base: string, attrs: any) => string }> = {
+        'Engine Oil': {
+            attributes: [
+                { key: 'viscosity', label: 'Viscosity', placeholder: 'e.g. 10W-40' },
+                { key: 'volume', label: 'Volume', placeholder: 'e.g. 1L' },
+                { key: 'base', label: 'Base Type', placeholder: 'e.g. Synthetic' }
+            ],
+            generateName: (brand, base, attrs) => `${brand} ${base} ${attrs.viscosity || ''} ${attrs.volume || ''}`.trim().replace(/\s+/g, ' ')
+        },
+        'Spark Plugs': {
+            attributes: [
+                { key: 'material', label: 'Material', placeholder: 'e.g. Iridium' },
+                { key: 'thread_size', label: 'Thread Size', placeholder: 'e.g. 14mm' },
+                { key: 'heat_range', label: 'Heat Range', placeholder: 'e.g. 6' }
+            ],
+            generateName: (brand, base, attrs) => `${brand} ${base} ${attrs.material || ''} ${attrs.thread_size || ''}`.trim().replace(/\s+/g, ' ')
+        },
+        'Fuel': {
+            attributes: [
+                { key: 'octane', label: 'Octane Rating', placeholder: 'e.g. 92' },
+                { key: 'type', label: 'Fuel Type', placeholder: 'e.g. Unleaded' }
+            ],
+            generateName: (brand, base, attrs) => `${brand} ${base} ${attrs.octane ? 'RON ' + attrs.octane : ''}`.trim().replace(/\s+/g, ' ')
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -115,14 +147,18 @@ export default function InventoryPage() {
     const openEditModal = (product: Product) => {
         setEditingProduct(product);
         setError(null);
+        const metadata = product.metadata ? (typeof product.metadata === 'string' ? JSON.parse(product.metadata) : product.metadata) : {};
         setFormData({
-            name: product.name,
+            base_name: metadata.base_name || product.name,
             description: (product as any).description || '',
             sku: product.sku || '',
             stock: product.stock,
             price: product.price,
             buy_price: (product as any).buy_price || 0,
-            category_id: (product as any).category_id?.toString() || ''
+            category_id: (product as any).category_id?.toString() || '',
+            brand_name: metadata.brand_name || '',
+            unit_of_measure: (product as any).unit_of_measure || 'pcs',
+            metadata: metadata
         });
         setIsModalOpen(true);
     };
@@ -131,7 +167,7 @@ export default function InventoryPage() {
         setIsModalOpen(false);
         setEditingProduct(null);
         setError(null);
-        setFormData({ name: '', description: '', sku: '', stock: 0, price: 0, buy_price: 0, category_id: '' });
+        setFormData({ base_name: '', description: '', sku: '', stock: 0, price: 0, buy_price: 0, category_id: '', brand_name: '', unit_of_measure: 'pcs', metadata: {} });
     };
 
     // Filtered and Sorted Products
@@ -187,8 +223,21 @@ export default function InventoryPage() {
             // Simulated loading delay
             await new Promise(r => setTimeout(r, 600));
 
+            // Generate Canonical Name based on template if available
+            const selectedCategoryName = categories.find(c => c.id === Number(formData.category_id))?.name || '';
+            const template = CATEGORY_TEMPLATES[selectedCategoryName];
+
+            let generatedName = formData.base_name;
+            if (template) {
+                generatedName = template.generateName(formData.brand_name, formData.base_name, formData.metadata);
+            } else if (formData.brand_name) {
+                generatedName = `${formData.brand_name} ${formData.base_name}`.trim();
+            }
+
             const payload = {
                 ...formData,
+                name: generatedName,
+                metadata: JSON.stringify({ ...formData.metadata, base_name: formData.base_name, brand_name: formData.brand_name }),
                 category_id: formData.category_id ? Number(formData.category_id) : null
             };
 
@@ -411,7 +460,7 @@ export default function InventoryPage() {
                         </Card>
                     </div>
 
-                    <Card shadow-premium>
+                    <Card className="shadow-premium">
                         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-6">
                             <div className="relative flex-1 max-w-md">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -552,11 +601,11 @@ export default function InventoryPage() {
                                                                         className="fixed inset-0 z-60"
                                                                         onClick={() => setActiveMenuId(null)}
                                                                     />
-                                                                    <div 
+                                                                    <div
                                                                         className="fixed z-70 bg-white rounded-2xl shadow-2xl border border-border p-2 min-w-[160px] animate-in fade-in zoom-in duration-200"
-                                                                        style={{ 
-                                                                            top: `${menuPosition.top + 8 - window.scrollY}px`, 
-                                                                            left: `${menuPosition.left - 160 - window.scrollX}px` 
+                                                                        style={{
+                                                                            top: `${menuPosition.top + 8 - window.scrollY}px`,
+                                                                            left: `${menuPosition.left - 160 - window.scrollX}px`
                                                                         }}
                                                                     >
                                                                         <div className="grid grid-cols-2 gap-2">
@@ -628,14 +677,72 @@ export default function InventoryPage() {
                                 <form onSubmit={handleSubmit} className="space-y-5">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         <div className="md:col-span-2">
-                                            <Input
-                                                label="Product Name"
-                                                required
-                                                value={formData.name}
-                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                placeholder="e.g. Engine Oil 5W-40"
-                                            />
+                                            <div className="flex flex-col space-y-1.5 mb-4">
+                                                <label className="text-sm font-bold text-slate-700 flex justify-between">
+                                                    Product Category
+                                                    <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="text-[10px] text-primary hover:underline uppercase tracking-widest">
+                                                        + Add New
+                                                    </button>
+                                                </label>
+                                                <select
+                                                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 sm:text-sm shadow-sm transition-all text-neutral disabled:bg-slate-100 disabled:text-slate-500 disabled:border-slate-200 disabled:cursor-not-allowed"
+                                                    disabled={!!editingProduct}
+                                                    value={formData.category_id}
+                                                    onChange={(e) => {
+                                                        setFormData({ ...formData, category_id: e.target.value, metadata: {} });
+                                                    }}
+                                                >
+                                                    <option value="">Select Category</option>
+                                                    {categories.filter(c => c.is_active !== 0).map(cat => (
+                                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <Input
+                                                    label="Brand Name"
+                                                    value={formData.brand_name}
+                                                    onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
+                                                    placeholder="e.g. Castrol"
+                                                />
+                                                <Input
+                                                    label="Entity / Base Name"
+                                                    required
+                                                    value={formData.base_name}
+                                                    onChange={(e) => setFormData({ ...formData, base_name: e.target.value })}
+                                                    placeholder="e.g. Magnatec"
+                                                />
+                                            </div>
                                         </div>
+
+                                        {/* Dynamic Metadata Attributes */}
+                                        {formData.category_id && (() => {
+                                            const catName = categories.find(c => c.id === Number(formData.category_id))?.name;
+                                            const template = CATEGORY_TEMPLATES[catName || ''];
+                                            if (template) {
+                                                return (
+                                                    <div className="md:col-span-2 bg-slate-50/50 p-4 rounded-xl border border-border grid grid-cols-2 gap-4">
+                                                        <div className="col-span-2">
+                                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Category Attributes ({catName})</p>
+                                                        </div>
+                                                        {template.attributes.map(attr => (
+                                                            <Input
+                                                                key={attr.key}
+                                                                label={attr.label}
+                                                                placeholder={attr.placeholder}
+                                                                value={formData.metadata[attr.key] || ''}
+                                                                onChange={(e) => setFormData({
+                                                                    ...formData,
+                                                                    metadata: { ...formData.metadata, [attr.key]: e.target.value }
+                                                                })}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
                                         <Input
                                             label="SKU / Barcode"
                                             disabled={!!editingProduct}
@@ -644,19 +751,19 @@ export default function InventoryPage() {
                                             placeholder="Barcode"
                                         />
                                         <div className="flex flex-col space-y-1.5">
-                                            <label className="text-sm font-bold text-slate-700">Product Category</label>
+                                            <label className="text-sm font-bold text-slate-700">Unit of Measure</label>
                                             <select
-                                                className="w-full px-4 py-2.5 rounded-xl border border-border bg-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 sm:text-sm shadow-sm transition-all text-neutral disabled:bg-slate-100 disabled:text-slate-500 disabled:border-slate-200 disabled:cursor-not-allowed"
-                                                disabled={!!editingProduct}
-                                                value={formData.category_id}
-                                                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-border bg-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 sm:text-sm shadow-sm transition-all text-neutral"
+                                                value={formData.unit_of_measure}
+                                                onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
                                             >
-                                                <option value="">Select Category</option>
-                                                {categories.filter(c => c.is_active !== 0).map(cat => (
-                                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                                ))}
+                                                <option value="pcs">Pieces (pcs)</option>
+                                                <option value="liters">Liters (L)</option>
+                                                <option value="boxes">Boxes</option>
+                                                <option value="sets">Sets</option>
                                             </select>
                                         </div>
+
                                         <Input
                                             label="Current Stock"
                                             type="number"
@@ -779,8 +886,8 @@ export default function InventoryPage() {
                                                                 <span className={cn(
                                                                     "px-2 py-0.5 rounded-md font-bold uppercase tracking-tight",
                                                                     entry.type === 'NEW ITEM' ? "bg-indigo-50 text-indigo-600 border border-indigo-100" :
-                                                                    entry.type === 'RESTOCK' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : 
-                                                                    "bg-blue-50 text-blue-600 border border-blue-100"
+                                                                        entry.type === 'RESTOCK' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
+                                                                            "bg-blue-50 text-blue-600 border border-blue-100"
                                                                 )}>
                                                                     {entry.type}
                                                                 </span>
