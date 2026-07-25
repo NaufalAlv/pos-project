@@ -12,6 +12,6 @@
     "install:all": "cd server && npm install && cd ../client && npm install && cd ../pump-controller && npm install"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.2.4"
   }
 }
